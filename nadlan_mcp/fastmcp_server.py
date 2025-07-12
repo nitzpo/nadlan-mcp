@@ -10,7 +10,7 @@ import json
 import logging
 from typing import List, Dict
 from mcp.server.fastmcp import FastMCP
-from .govmap import GovmapClient
+from nadlan_mcp.govmap import GovmapClient
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
