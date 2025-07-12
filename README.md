@@ -1,6 +1,6 @@
 # Israel Real Estate MCP
 
-A Python-based Mission Control Program (MCP) for interacting with the Israeli government's public real estate data API (Govmap). This tool allows real estate agents and professionals to query recent property deals based on addresses, search for properties, and retrieve detailed market information.
+A Python-based Mission Control Program (MCP) for interacting with the Israeli government's public real estate data API (Govmap). This project provides both a Python library and an MCP server that allows real estate agents, professionals, and AI agents to query recent property deals, analyze market trends, and retrieve detailed real estate information.
 
 ## Description
 
@@ -62,7 +62,196 @@ This project provides a comprehensive Python interface to the Israeli government
 
 ## Usage
 
-### Basic Usage
+### MCP Server (Recommended for AI Agents)
+
+The project includes an MCP (Model Context Protocol) server that allows AI agents to access Israeli real estate data. The server provides multiple deployment options:
+
+#### 1. Interactive Demo Server
+
+For testing and demonstration purposes:
+
+```bash
+python simple_mcp_server.py
+```
+
+This runs an interactive demo where you can test the tools directly in the terminal.
+
+#### 2. Full MCP Server
+
+For production use with MCP clients:
+
+```bash
+python run_mcp_server.py
+```
+
+This starts the full MCP server that can be connected to by MCP-compatible clients.
+
+#### 3. Direct Server Module
+
+You can also run the server directly:
+
+```bash
+python -m nadlan_mcp.mcp_server
+```
+
+#### MCP Client Configuration
+
+To connect to the server from MCP clients, use the following configuration:
+
+**For Claude Desktop or other MCP clients:**
+
+Add to your MCP client configuration:
+
+```json
+{
+  "servers": {
+    "nadlan-mcp": {
+      "command": "python",
+      "args": ["/path/to/nadlan-mcp/run_mcp_server.py"],
+      "env": {}
+    }
+  }
+}
+```
+
+**For development with stdio transport:**
+
+```python
+import asyncio
+from mcp.client.stdio import stdio_client
+
+async def main():
+    async with stdio_client(["python", "run_mcp_server.py"]) as client:
+        # List available tools
+        result = await client.list_tools()
+        print("Available tools:", result.tools)
+        
+        # Call a tool
+        result = await client.call_tool("find_recent_deals_for_address", {
+            "address": "סוקולוב 38 חולון",
+            "years_back": 2
+        })
+        print("Results:", result)
+
+asyncio.run(main())
+```
+
+#### Available MCP Tools
+
+The server provides these tools for AI agents:
+
+##### 🏠 `find_recent_deals_for_address`
+**Main comprehensive analysis tool**
+- **Description**: Find all relevant real estate deals for a given address
+- **Parameters**: 
+  - `address` (required): The address to search for (Hebrew or English)
+  - `years_back` (optional): Number of years to look back (default: 2)
+- **Returns**: List of deals with detailed information
+
+**Example usage:**
+```json
+{
+  "address": "בן יהודה 1 תל אביב",
+  "years_back": 3
+}
+```
+
+##### 📊 `analyze_market_trends`
+**Market trend analysis with price insights**
+- **Description**: Analyze price trends and market data for an address
+- **Parameters**:
+  - `address` (required): The address to analyze
+  - `years_back` (optional): Number of years to analyze (default: 2)
+- **Returns**: Market analysis with trends, average prices, and insights
+
+**Example usage:**
+```json
+{
+  "address": "דיזנגוף 50 תל אביב",
+  "years_back": 5
+}
+```
+
+##### 🏘️ `compare_neighborhoods`
+**Compare multiple areas**
+- **Description**: Compare real estate data across multiple addresses or neighborhoods
+- **Parameters**:
+  - `addresses` (required): List of addresses to compare
+  - `years_back` (optional): Number of years to analyze (default: 2)
+- **Returns**: Comparative analysis with rankings and insights
+
+**Example usage:**
+```json
+{
+  "addresses": ["סוקולוב 38 חולון", "בן יהודה 1 תל אביב", "דיזנגוף 50 תל אביב"],
+  "years_back": 2
+}
+```
+
+##### 🔍 `autocomplete_address`
+**Address search and validation**
+- **Description**: Search for and validate Israeli addresses
+- **Parameters**:
+  - `search_text` (required): The address text to search for
+- **Returns**: List of matching addresses with coordinates
+
+**Example usage:**
+```json
+{
+  "search_text": "רוטשילד תל אביב"
+}
+```
+
+#### Server Features
+
+- **Async Operations**: All tools run asynchronously for better performance
+- **Error Handling**: Comprehensive error handling with meaningful error messages
+- **Logging**: Detailed logging for debugging and monitoring
+- **Data Validation**: Input validation and sanitization
+- **Hebrew Support**: Full support for Hebrew addresses and text
+
+#### Testing the Server
+
+You can test the server using the interactive demo:
+
+```bash
+python simple_mcp_server.py
+```
+
+This will start an interactive session where you can:
+1. List available tools
+2. Call tools with parameters
+3. See formatted results
+4. Test error handling
+
+#### Server Logs
+
+The server provides detailed logging. To see debug information:
+
+```bash
+# Set logging level before running
+export PYTHONPATH=/path/to/nadlan-mcp
+python -c "import logging; logging.basicConfig(level=logging.DEBUG)" run_mcp_server.py
+```
+
+#### Troubleshooting
+
+**Connection Issues:**
+- Ensure all dependencies are installed: `pip install -r requirements.txt`
+- Check that Python path is correct in client configuration
+- Verify the server starts without errors
+
+**Tool Execution Issues:**
+- Check network connectivity for API calls
+- Verify address format (Hebrew addresses work best)
+- Review server logs for detailed error information
+
+**Performance:**
+- Use appropriate `years_back` values (2-5 years recommended)
+- Large radius searches may take longer
+- Consider caching results for repeated queries
+
+### Python Library Usage
 
 ```python
 from nadlan_mcp import GovmapClient
@@ -269,7 +458,9 @@ logging.basicConfig(level=logging.DEBUG)
 ## Dependencies
 
 - **requests**: HTTP library for API calls
-- **python-dotenv**: Environment variable management (for future configuration)
+- **python-dotenv**: Environment variable management
+- **mcp**: Model Context Protocol SDK for AI agent integration
+- **pytest**: Testing framework
 
 ## License
 
