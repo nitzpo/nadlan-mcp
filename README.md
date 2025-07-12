@@ -66,7 +66,17 @@ This project provides a comprehensive Python interface to the Israeli government
 
 The project includes an MCP (Model Context Protocol) server that allows AI agents to access Israeli real estate data. The server provides multiple deployment options:
 
-#### 1. Interactive Demo Server
+#### 1. FastMCP Server (Recommended)
+
+**NEW: Using FastMCP for better compatibility and reliability**
+
+```bash
+python run_fastmcp_server.py
+```
+
+This starts the FastMCP server which resolves compatibility issues with the standard MCP library.
+
+#### 2. Interactive Demo Server
 
 For testing and demonstration purposes:
 
@@ -76,7 +86,7 @@ python simple_mcp_server.py
 
 This runs an interactive demo where you can test the tools directly in the terminal.
 
-#### 2. Full MCP Server
+#### 3. Full MCP Server (Legacy)
 
 For production use with MCP clients:
 
@@ -86,21 +96,35 @@ python run_mcp_server.py
 
 This starts the full MCP server that can be connected to by MCP-compatible clients.
 
-#### 3. Direct Server Module
+#### 4. Direct Server Module
 
 You can also run the server directly:
 
 ```bash
-python -m nadlan_mcp.mcp_server
+python -m nadlan_mcp.simple_fastmcp_server
 ```
 
 #### MCP Client Configuration
 
 To connect to the server from MCP clients, use the following configuration:
 
-**For Claude Desktop or other MCP clients:**
+**For Claude Desktop or other MCP clients (FastMCP - Recommended):**
 
 Add to your MCP client configuration:
+
+```json
+{
+  "servers": {
+    "nadlan-mcp": {
+      "command": "python",
+      "args": ["/path/to/nadlan-mcp/run_fastmcp_server.py"],
+      "env": {}
+    }
+  }
+}
+```
+
+**Alternative (Legacy MCP Server):**
 
 ```json
 {
@@ -114,14 +138,14 @@ Add to your MCP client configuration:
 }
 ```
 
-**For development with stdio transport:**
+**For development with stdio transport (FastMCP):**
 
 ```python
 import asyncio
 from mcp.client.stdio import stdio_client
 
 async def main():
-    async with stdio_client(["python", "run_mcp_server.py"]) as client:
+    async with stdio_client(["python", "run_fastmcp_server.py"]) as client:
         # List available tools
         result = await client.list_tools()
         print("Available tools:", result.tools)
@@ -138,7 +162,14 @@ asyncio.run(main())
 
 #### Available MCP Tools
 
-The server provides these tools for AI agents:
+**FastMCP Server provides these 5 tools:**
+- 🏠 `find_recent_deals_for_address` - Main comprehensive analysis tool
+- 📊 `get_deals_by_radius` - Find deals within a radius of coordinates
+- 🏘️ `get_street_deals` - Get deals for a specific street polygon
+- 🔍 `autocomplete_address` - Address search and validation
+- 📈 `compare_addresses` - Compare multiple addresses
+
+**Legacy MCP Server provides these 4 tools:**
 
 ##### 🏠 `find_recent_deals_for_address`
 **Main comprehensive analysis tool**
