@@ -86,15 +86,15 @@ python simple_mcp_server.py
 
 This runs an interactive demo where you can test the tools directly in the terminal.
 
-#### 3. Full MCP Server (Legacy)
+#### 3. Alternative: Interactive Demo
 
-For production use with MCP clients:
+For testing and demonstrations:
 
 ```bash
-python run_mcp_server.py
+python simple_mcp_server.py
 ```
 
-This starts the full MCP server that can be connected to by MCP-compatible clients.
+This runs an interactive demo where you can test the tools directly in the terminal.
 
 #### 4. Direct Server Module
 
@@ -124,19 +124,7 @@ Add to your MCP client configuration:
 }
 ```
 
-**Alternative (Legacy MCP Server):**
 
-```json
-{
-  "servers": {
-    "nadlan-mcp": {
-      "command": "python",
-      "args": ["/path/to/nadlan-mcp/run_mcp_server.py"],
-      "env": {}
-    }
-  }
-}
-```
 
 **For development with stdio transport (FastMCP):**
 
@@ -162,14 +150,16 @@ asyncio.run(main())
 
 #### Available MCP Tools
 
-**FastMCP Server provides these 5 tools:**
+**FastMCP Server provides these 7 tools:**
 - 🏠 `find_recent_deals_for_address` - Main comprehensive analysis tool
 - 📊 `get_deals_by_radius` - Find deals within a radius of coordinates
 - 🏘️ `get_street_deals` - Get deals for a specific street polygon
+- 🏘️ `get_neighborhood_deals` - Get deals for a specific neighborhood polygon
 - 🔍 `autocomplete_address` - Address search and validation
-- 📈 `compare_addresses` - Compare multiple addresses
+- 📈 `analyze_market_trends` - Analyze market trends and price patterns
+- 📊 `compare_addresses` - Compare multiple addresses
 
-**Legacy MCP Server provides these 4 tools:**
+**All Tools Details:**
 
 ##### 🏠 `find_recent_deals_for_address`
 **Main comprehensive analysis tool**
