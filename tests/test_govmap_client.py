@@ -5,7 +5,7 @@ Tests for the GovmapClient class.
 import pytest
 import requests
 from unittest.mock import Mock, patch
-from nadlan_mcp.main import GovmapClient
+from nadlan_mcp.govmap import GovmapClient
 
 
 class TestGovmapClient:

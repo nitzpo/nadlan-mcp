@@ -14,7 +14,7 @@ from typing import Any, Dict, List
 # Simple MCP server implementation
 class SimpleMCPServer:
     def __init__(self):
-        from nadlan_mcp.main import GovmapClient
+        from nadlan_mcp.govmap import GovmapClient
         self.client = GovmapClient()
         self.tools = {
             "find_recent_deals_for_address": {
