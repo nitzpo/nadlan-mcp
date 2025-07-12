@@ -1,0 +1,161 @@
+Hello Claude,
+
+I need your help in creating a Python-based MCP (Mission Control Program) to interact with the Israeli government's public real estate data API (Govmap). The primary goal of this MCP is to allow a real estate agent to query for recent property deals based on a given address.
+
+Please generate a complete Python project structure (or merge with the current project), including a README.md file, a requirements.txt file, and the main Python script. The project should be well-documented, easy to set up, and provide clear functions for accessing the different API endpoints.
+
+Here is a breakdown of the requirements:
+
+Project Structure
+Please create the following file structure:
+
+nadlan-mcp/
+├── README.md
+├── requirements.txt
+└── nadlan_mcp/
+    ├── __init__.py
+    └── main.py
+
+README.md File
+The README.md file should be comprehensive and include the following sections:
+
+Project Title: Israel Real Estate MCP
+
+Description: A short description of the project's purpose.
+
+Features: A list of the key functionalities, such as searching for properties, finding block/parcel information, and retrieving deal data.
+
+Installation: Clear instructions on how to set up the project, including cloning the repository, creating a virtual environment, and installing the required packages using requirements.txt.
+
+Usage: Detailed examples of how to use the Python functions from the main.py script. This should include code snippets for each of the main use cases.
+
+API Reference: A brief overview of the Govmap API endpoints being used.
+
+requirements.txt File
+This file should list all the necessary Python libraries for the project. At a minimum, it should include:
+
+requests
+python-dotenv
+
+Python Code (nadlan_mcp/main.py)
+This will be the core of the project. Please implement the following functions, making sure to handle potential errors (e.g., network issues, invalid API responses) gracefully.
+
+API Client Setup
+Create a class GovmapClient that will handle all interactions with the Govmap API.
+
+The base URL for the API is https://www.govmap.gov.il/api/.
+
+The class should use a requests.Session object to manage connections.
+
+Functions to Implement
+autocomplete_address(search_text: str)
+
+Purpose: Given a free-text address, this function should use the /search-service/autocomplete endpoint to find the most likely match.
+
+Parameters:
+
+search_text: The address to search for (e.g., "סוקולוב 38 חולון").
+
+Returns: The JSON response from the API, which includes the coordinates of the address.
+
+get_gush_helka(point: tuple)
+
+Purpose: Given a coordinate point, this function should use the /layers-catalog/entitiesByPoint endpoint to retrieve the "Gush" (Block) and "Helka" (Parcel) information.
+
+Parameters:
+
+point: A tuple of (longitude, latitude).
+
+Returns: The JSON response containing the block and parcel data.
+
+get_deals_by_radius(point: tuple, radius: int = 50)
+
+Purpose: Finds high-level information about real estate deals within a specified radius of a point. Uses the /real-estate/deals/{point}/{radius} endpoint.
+
+Parameters:
+
+point: A tuple of (longitude, latitude).
+
+radius: The search radius in meters (default to 50).
+
+Returns: A list of deals found within the radius.
+
+get_street_deals(polygon_id: str, limit: int = 10, start_date: str = None, end_date: str = None)
+
+Purpose: Retrieves detailed information about deals on a specific street, identified by a polygon_id. Uses the /real-estate/street-deals/{polygon_id} endpoint.
+
+Parameters:
+
+polygon_id: The ID of the lot's polygon.
+
+limit: The maximum number of deals to return (default to 10).
+
+start_date: The start date for the search in 'YYYY-MM' format.
+
+end_date: The end date for the search in 'YYYY-MM' format.
+
+Returns: A list of detailed deal information for the street.
+
+get_neighborhood_deals(polygon_id: str, limit: int = 10, start_date: str = None, end_date: str = None)
+
+Purpose: Retrieves deals within the same neighborhood as the given polygon_id. Uses the /real-estate/neighborhood-deals/{polygon_id} endpoint.
+
+Parameters:
+
+polygon_id: The ID of the lot's polygon.
+
+limit: The maximum number of deals to return (default to 10).
+
+start_date: The start date for the search in 'YYYY-MM' format.
+
+end_date: The end date for the search in 'YYYY-MM' format.
+
+Returns: A list of deals in the neighborhood.
+
+Main Use Case Function
+Please create a high-level function that ties everything together for the primary use case.
+
+find_recent_deals_for_address(address: str, years_back: int = 2)
+
+Purpose: This function should take an address and find all relevant real estate deals from the last few years.
+
+Workflow:
+
+Call autocomplete_address to get the coordinates for the given address.
+
+Extract the point from the autocomplete response.
+
+Call get_deals_by_radius to get the polygon_id for nearby properties.
+
+For each unique polygon_id found, call get_street_deals and get_neighborhood_deals.
+
+Filter the results to only include deals within the specified time frame (years_back).
+
+Combine and de-duplicate the results.
+
+Return a clean, formatted list of deals.
+
+API Query Examples for Context
+Here are some curl examples that show how the API works. Please use these as a reference when building the Python functions.
+
+Autocomplete:
+
+curl -X POST https://www.govmap.gov.il/api/search-service/autocomplete -H "Content-Type: application/json" -d '{"searchText": "סוקולוב 38 חולון", "language": "he", "isAccurate": false, "maxResults": 10}'
+
+Entities by Point (Gush/Helka):
+
+curl -X POST https://www.govmap.gov.il/api/layers-catalog/entitiesByPoint -H "Content-Type: application/json" -d '{"point":[3870923.9531396534,3766288.069885358],"layers":[{"layerId":"16"}],"tolerance":0}'
+
+Deals by Radius:
+
+curl -X GET https://www.govmap.gov.il/api/real-estate/deals/3872355.023513328,3765591.163209798/30
+
+Street Deals:
+
+curl -X GET "https://www.govmap.gov.il/api/real-estate/street-deals/52190246?limit=3"
+
+Neighborhood Deals:
+
+curl -X GET "https://www.govmap.gov.il/api/real-estate/neighborhood-deals/52282030?limit=8"
+
+Please ensure the final output is a complete, runnable, and well-documented Python project that fulfills all these requirements. Thank you!
