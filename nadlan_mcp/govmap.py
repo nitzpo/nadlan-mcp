@@ -225,18 +225,24 @@ class GovmapClient:
             logger.error(f"Error parsing JSON response: {e}")
             return []
 
-    def find_recent_deals_for_address(self, address: str, years_back: int = 2) -> List[Dict[str, Any]]:
+    def find_recent_deals_for_address(self, address: str, years_back: int = 2, 
+                                    radius: int = 30, max_deals: int = 200) -> List[Dict[str, Any]]:
         """
         Find all relevant real estate deals for a given address from the last few years.
 
         This is the main use case function that ties everything together.
+        Street deals include deals from the same building which get highest priority.
 
         Args:
             address: The address to search for
             years_back: How many years back to search (default: 2)
+            radius: Search radius in meters for initial coordinate search (default: 30)
+                   Small radius since street deals cover the entire street anyway
+            max_deals: Maximum number of deals to return (default: 200)
 
         Returns:
-            List of deals found for the address area
+            List of deals found for the address area, with same building deals prioritized first,
+            then street deals, then neighborhood deals
 
         Raises:
             ValueError: If address cannot be found or processed
@@ -268,10 +274,11 @@ class GovmapClient:
                 raise ValueError("Invalid coordinate format in autocomplete result")
 
             point = (float(coords[0]), float(coords[1]))
+            search_address_normalized = address.lower().strip()
             logger.info(f"Found coordinates: {point}")
 
             # Step 2: Get deals by radius to find polygon IDs
-            nearby_deals = self.get_deals_by_radius(point, radius=30)  # Slightly larger radius
+            nearby_deals = self.get_deals_by_radius(point, radius=radius)
 
             # Extract unique polygon IDs
             polygon_ids = set()
@@ -288,46 +295,136 @@ class GovmapClient:
             end_date_str = end_date.strftime('%Y-%m')
 
             # Step 4: Get street and neighborhood deals for each polygon
-            all_deals = []
+            # Prioritize: same building (0) > street deals (1) > neighborhood deals (2)
+            building_deals = []
+            street_deals = []
+            neighborhood_deals = []
             seen_deals = set()  # For deduplication
 
             for polygon_id in polygon_ids:
                 try:
-                    # Get street deals
-                    street_deals = self.get_street_deals(
-                        polygon_id, limit=50,
+                    # Get street deals first (higher priority)
+                    current_street_deals = self.get_street_deals(
+                        polygon_id, limit=max_deals // 2,  # Allocate more to street deals
                         start_date=start_date_str, end_date=end_date_str
                     )
 
-                    # Get neighborhood deals
-                    neighborhood_deals = self.get_neighborhood_deals(
-                        polygon_id, limit=50,
+                    # Get neighborhood deals (lower priority)
+                    current_neighborhood_deals = self.get_neighborhood_deals(
+                        polygon_id, limit=max_deals // 4,  # Allocate less to neighborhood deals
                         start_date=start_date_str, end_date=end_date_str
                     )
 
-                    # Combine deals
-                    combined_deals = street_deals + neighborhood_deals
-
-                    # Add to results with deduplication
-                    for deal in combined_deals:
-                        # Create a unique identifier for the deal
+                    # Process street deals and separate building deals
+                    for deal in current_street_deals:
                         deal_id = f"{deal.get('dealId', '')}{deal.get('address', '')}{deal.get('dealDate', '')}"
-
                         if deal_id not in seen_deals:
                             seen_deals.add(deal_id)
-                            deal['source_polygon_id'] = polygon_id  # Add source for reference
-                            all_deals.append(deal)
+                            deal['source_polygon_id'] = polygon_id
+                            deal['deal_source'] = 'street'
+                            
+                            # Check if this is from the same building
+                            deal_address = deal.get('address', '').lower().strip()
+                            if self._is_same_building(search_address_normalized, deal_address):
+                                deal['deal_source'] = 'same_building'
+                                deal['priority'] = 0  # Highest priority
+                                building_deals.append(deal)
+                            else:
+                                deal['priority'] = 1  # Street deals priority
+                                street_deals.append(deal)
+
+                    # Add neighborhood deals with lowest priority
+                    for deal in current_neighborhood_deals:
+                        deal_id = f"{deal.get('dealId', '')}{deal.get('address', '')}{deal.get('dealDate', '')}"
+                        if deal_id not in seen_deals:
+                            seen_deals.add(deal_id)
+                            deal['source_polygon_id'] = polygon_id
+                            deal['deal_source'] = 'neighborhood'
+                            deal['priority'] = 2  # Lowest priority
+                            neighborhood_deals.append(deal)
 
                 except Exception as e:
                     logger.warning(f"Error processing polygon {polygon_id}: {e}")
                     continue
 
-            # Step 5: Sort by date (newest first)
-            all_deals.sort(key=lambda x: x.get('dealDate', ''), reverse=True)
+            # Step 5: Combine and prioritize: building deals first, then street, then neighborhood
+            all_deals = building_deals + street_deals + neighborhood_deals
 
-            logger.info(f"Found {len(all_deals)} total deals for address: {address}")
+            # Use stable sort: first by date (newest first), then by priority
+            # Since Python's sort is stable, the second sort maintains date order within each priority
+            all_deals.sort(key=lambda x: x.get('dealDate', '1900-01-01'), reverse=True)  # Newest first
+            all_deals.sort(key=lambda x: x.get('priority', 3))  # Priority first (0=building, 1=street, 2=neighborhood)
+
+            # Limit to max_deals
+            if len(all_deals) > max_deals:
+                all_deals = all_deals[:max_deals]
+
+            # Add price per square meter calculation
+            for deal in all_deals:
+                price = deal.get('dealAmount', 0)
+                area = deal.get('assetArea', 0)
+                if isinstance(price, (int, float)) and isinstance(area, (int, float)) and area > 0:
+                    deal['price_per_sqm'] = round(price / area, 2)
+                else:
+                    deal['price_per_sqm'] = None
+
+            logger.info(f"Found {len(all_deals)} total deals for address: {address} "
+                       f"(Building: {len(building_deals)}, Street: {len(street_deals)}, Neighborhood: {len(neighborhood_deals)})")
             return all_deals
 
         except Exception as e:
             logger.error(f"Error in find_recent_deals_for_address: {e}")
             raise
+
+    def _is_same_building(self, search_address: str, deal_address: str) -> bool:
+        """
+        Check if a deal is from the same building as the search address.
+        
+        Args:
+            search_address: The normalized search address (lowercase, stripped)
+            deal_address: The normalized deal address (lowercase, stripped)
+            
+        Returns:
+            True if likely the same building, False otherwise
+        """
+        if not search_address or not deal_address:
+            return False
+            
+        # Exact match
+        if search_address == deal_address:
+            return True
+            
+        # Extract key components for comparison
+        def extract_address_parts(addr: str) -> tuple:
+            """Extract street name and number from address"""
+            # Remove common prefixes/suffixes and normalize
+            addr_clean = addr.replace('רח\'', '').replace('רחוב', '').replace('שד\'', '').replace('שדרות', '')
+            addr_clean = addr_clean.replace('  ', ' ').strip()
+            
+            # Try to extract number and street name
+            parts = addr_clean.split()
+            if len(parts) >= 2:
+                # Look for number (could be at start or end)
+                for i, part in enumerate(parts):
+                    if part.isdigit() or any(c.isdigit() for c in part):
+                        number = part
+                        street_parts = parts[:i] + parts[i+1:]
+                        street_name = ' '.join(street_parts).strip()
+                        return (street_name, number)
+            
+            return (addr_clean, '')
+        
+        search_street, search_number = extract_address_parts(search_address)
+        deal_street, deal_number = extract_address_parts(deal_address)
+        
+        # Same street and same number = same building
+        if (search_street and deal_street and search_number and deal_number and
+            search_street == deal_street and search_number == deal_number):
+            return True
+            
+        # Check if one address is contained in the other (for different formats of same address)
+        if len(search_address) > 5 and len(deal_address) > 5:
+            if search_address in deal_address or deal_address in search_address:
+                return True
+                
+        return False
