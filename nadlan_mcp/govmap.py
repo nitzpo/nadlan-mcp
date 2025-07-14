@@ -226,7 +226,7 @@ class GovmapClient:
             return []
 
     def find_recent_deals_for_address(self, address: str, years_back: int = 2, 
-                                    radius: int = 30, max_deals: int = 200) -> List[Dict[str, Any]]:
+                                    radius: int = 30, max_deals: int = 50) -> List[Dict[str, Any]]:
         """
         Find all relevant real estate deals for a given address from the last few years.
 

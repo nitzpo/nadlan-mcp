@@ -112,7 +112,7 @@ def get_street_deals(polygon_id: str, limit: int = 100) -> str:
         return f"Error fetching street deals: {str(e)}"
 
 @mcp.tool()
-def find_recent_deals_for_address(address: str, years_back: int = 2, radius_meters: int = 30, max_deals: int = 200) -> str:
+def find_recent_deals_for_address(address: str, years_back: int = 2, radius_meters: int = 30, max_deals: int = 50) -> str:
     """Find recent real estate deals for a specific address.
     
     Args:
@@ -120,7 +120,7 @@ def find_recent_deals_for_address(address: str, years_back: int = 2, radius_mete
         years_back: How many years back to search (default: 2)
         radius_meters: Search radius in meters from the address (default: 30)
                       Small radius since street deals cover the entire street anyway
-        max_deals: Maximum number of deals to return (default: 200)
+        max_deals: Maximum number of deals to return (default: 50, optimized for LLM token limits)
         
     Returns:
         JSON string containing recent real estate deals for the address
@@ -243,24 +243,17 @@ def get_neighborhood_deals(polygon_id: str, limit: int = 100) -> str:
         return f"Error fetching neighborhood deals: {str(e)}"
 
 @mcp.tool()
-def analyze_market_trends(address: str, years_back: int = 3, radius_meters: int = 300, max_deals: int = 500) -> str:
+def analyze_market_trends(address: str, years_back: int = 3, radius_meters: int = 300, max_deals: int = 100) -> str:
     """Analyze market trends and price patterns for an area with comprehensive data.
     
     Args:
         address: The address to analyze trends around
         years_back: How many years of data to analyze (default: 3)
         radius_meters: Search radius in meters from the address (default: 300, larger for trend analysis)
-        max_deals: Maximum number of deals to analyze (default: 500)
+        max_deals: Maximum number of deals to analyze (default: 100, optimized for performance and token limits)
         
     Returns:
-        JSON string containing comprehensive market trend analysis including:
-        - Detailed price trends over time
-        - Average prices by property type
-        - Market activity levels and patterns
-        - Price per square meter trends
-        - Seasonal patterns
-        - Market velocity indicators
-        - Comparative neighborhood analysis
+        JSON string containing comprehensive market trend analysis (summarized data, not raw deals)
     """
     try:
         # Get deals for the address with larger radius for trend analysis
@@ -269,25 +262,20 @@ def analyze_market_trends(address: str, years_back: int = 3, radius_meters: int 
         if not deals:
             return f"No deals found for comprehensive market analysis near '{address}'"
         
-        # Comprehensive analysis structure
+        # Efficient analysis with reduced complexity
         from collections import defaultdict
         
         yearly_data = defaultdict(list)
-        monthly_data = defaultdict(list)
-        property_types: Dict[str, List[Dict]] = defaultdict(list)
+        property_types: Dict[str, List[float]] = defaultdict(list)  # Store only prices for efficiency
         neighborhoods = defaultdict(list)
-        quarterly_data = defaultdict(list)
         
-        # Process each deal for comprehensive analysis
+        # Simplified processing - extract only essential data
         for deal in deals:
             date_str = deal.get('dealDate', '')
             if not date_str:
                 continue
                 
             year = date_str[:4]
-            month = date_str[:7]  # YYYY-MM
-            quarter = f"{year}-Q{((int(date_str[5:7]) - 1) // 3) + 1}" if len(date_str) >= 7 else None
-            
             price = deal.get('dealAmount')
             area = deal.get('assetArea')
             price_per_sqm = deal.get('price_per_sqm')
@@ -295,172 +283,99 @@ def analyze_market_trends(address: str, years_back: int = 3, radius_meters: int 
             neighborhood = deal.get('settlementNameHeb', deal.get('neighborhood', 'לא ידוע'))
             deal_source = deal.get('deal_source', 'unknown')
             
-            deal_data = {
-                'price': price,
-                'area': area,
-                'price_per_sqm': price_per_sqm,
-                'property_type': prop_type,
-                'neighborhood': neighborhood,
-                'deal_source': deal_source,
-                'date': date_str
-            }
-            
-            if isinstance(price, (int, float)) and isinstance(area, (int, float)) and area > 0:
-                yearly_data[year].append(deal_data)
-                monthly_data[month].append(deal_data)
-                if quarter:
-                    quarterly_data[quarter].append(deal_data)
-                property_types[prop_type].append(deal_data)
-                neighborhoods[neighborhood].append(deal_data)
+            if isinstance(price, (int, float)) and isinstance(area, (int, float)) and area > 0 and isinstance(price_per_sqm, (int, float)):
+                yearly_data[year].append({
+                    'price': price, 'area': area, 'price_per_sqm': price_per_sqm, 'deal_source': deal_source
+                })
+                property_types[prop_type].append(price_per_sqm)
+                neighborhoods[neighborhood].append(price_per_sqm)
         
-        # Calculate comprehensive yearly trends
+        # Calculate streamlined yearly trends
         yearly_trends = {}
         for year, year_deals in yearly_data.items():
             if year_deals:
-                prices = [d['price'] for d in year_deals if d['price']]
-                price_per_sqm_vals = [d['price_per_sqm'] for d in year_deals if d['price_per_sqm']]
-                areas = [d['area'] for d in year_deals if d['area']]
+                prices = [d['price'] for d in year_deals]
+                price_per_sqm_vals = [d['price_per_sqm'] for d in year_deals]
                 building_deals = [d for d in year_deals if d['deal_source'] == 'same_building']
                 street_deals = [d for d in year_deals if d['deal_source'] == 'street']
-                neighborhood_deals = [d for d in year_deals if d['deal_source'] == 'neighborhood']
                 
                 yearly_trends[year] = {
                     "deal_count": len(year_deals),
-                    "same_building_deals_count": len(building_deals),
-                    "street_deals_count": len(street_deals),
-                    "neighborhood_deals_count": len(neighborhood_deals),
-                    "same_building_percentage": round((len(building_deals) / len(year_deals)) * 100, 1),
-                    "street_deals_percentage": round((len(street_deals) / len(year_deals)) * 100, 1),
-                    "average_price": round(sum(prices) / len(prices), 0) if prices else 0,
-                    "median_price": round(sorted(prices)[len(prices)//2], 0) if prices else 0,
-                    "min_price": min(prices) if prices else 0,
-                    "max_price": max(prices) if prices else 0,
-                    "price_std_dev": round((sum([(p - sum(prices)/len(prices))**2 for p in prices]) / len(prices))**0.5, 0) if len(prices) > 1 else 0,
-                    "average_area": round(sum(areas) / len(areas), 1) if areas else 0,
-                    "average_price_per_sqm": round(sum(price_per_sqm_vals) / len(price_per_sqm_vals), 0) if price_per_sqm_vals else 0,
-                    "median_price_per_sqm": round(sorted(price_per_sqm_vals)[len(price_per_sqm_vals)//2], 0) if price_per_sqm_vals else 0,
-                    "total_market_volume": sum(prices) if prices else 0
+                    "same_building_deals": len(building_deals),
+                    "street_deals": len(street_deals),
+                    "avg_price": round(sum(prices) / len(prices), 0),
+                    "avg_price_per_sqm": round(sum(price_per_sqm_vals) / len(price_per_sqm_vals), 0),
+                    "min_price_per_sqm": round(min(price_per_sqm_vals), 0),
+                    "max_price_per_sqm": round(max(price_per_sqm_vals), 0),
+                    "total_volume": sum(prices)
                 }
         
-        # Calculate quarterly trends for seasonality analysis
-        quarterly_trends = {}
-        for quarter, quarter_deals in quarterly_data.items():
-            if quarter_deals:
-                prices = [d['price'] for d in quarter_deals if d['price']]
-                price_per_sqm_vals = [d['price_per_sqm'] for d in quarter_deals if d['price_per_sqm']]
-                
-                quarterly_trends[quarter] = {
-                    "deal_count": len(quarter_deals),
-                    "average_price": round(sum(prices) / len(prices), 0) if prices else 0,
-                    "average_price_per_sqm": round(sum(price_per_sqm_vals) / len(price_per_sqm_vals), 0) if price_per_sqm_vals else 0
-                }
-        
-        # Property type analysis
+        # Streamlined property type analysis (top 5 only)
         property_type_analysis = {}
-        for prop_type, type_deals in property_types.items():
-            if type_deals:
-                prices = [d['price'] for d in type_deals if d['price']]
-                price_per_sqm_vals = [d['price_per_sqm'] for d in type_deals if d['price_per_sqm']]
-                areas = [d['area'] for d in type_deals if d['area']]
-                
+        for prop_type, prices_per_sqm in property_types.items():
+            if len(prices_per_sqm) >= 2:  # Only include types with multiple deals
                 property_type_analysis[prop_type] = {
-                    "deal_count": len(type_deals),
-                    "market_share_percentage": round((len(type_deals) / len(deals)) * 100, 1),
-                    "average_price": round(sum(prices) / len(prices), 0) if prices else 0,
-                    "average_area": round(sum(areas) / len(areas), 1) if areas else 0,
-                    "average_price_per_sqm": round(sum(price_per_sqm_vals) / len(price_per_sqm_vals), 0) if price_per_sqm_vals else 0
+                    "deal_count": len(prices_per_sqm),
+                    "avg_price_per_sqm": round(sum(prices_per_sqm) / len(prices_per_sqm), 0)
                 }
         
-        # Neighborhood comparison analysis
+        # Keep only top 5 property types by deal count
+        property_type_analysis = dict(sorted(property_type_analysis.items(), 
+                                           key=lambda x: x[1]['deal_count'], reverse=True)[:5])
+        
+        # Streamlined neighborhood analysis (top 5 only)
         neighborhood_analysis = {}
-        for neighborhood, neighborhood_deals in neighborhoods.items():
-            if neighborhood_deals and len(neighborhood_deals) >= 3:  # Only include neighborhoods with sufficient data
-                prices = [d['price'] for d in neighborhood_deals if d['price']]
-                price_per_sqm_vals = [d['price_per_sqm'] for d in neighborhood_deals if d['price_per_sqm']]
-                
+        for neighborhood, prices_per_sqm in neighborhoods.items():
+            if len(prices_per_sqm) >= 3:  # Minimum 3 deals for statistical significance
                 neighborhood_analysis[neighborhood] = {
-                    "deal_count": len(neighborhood_deals),
-                    "average_price": round(sum(prices) / len(prices), 0) if prices else 0,
-                    "average_price_per_sqm": round(sum(price_per_sqm_vals) / len(price_per_sqm_vals), 0) if price_per_sqm_vals else 0
+                    "deal_count": len(prices_per_sqm),
+                    "avg_price_per_sqm": round(sum(prices_per_sqm) / len(prices_per_sqm), 0)
                 }
         
-        # Market trend direction analysis
-        price_trend_analysis = {}
+        # Keep only top 5 neighborhoods by deal count
+        neighborhood_analysis = dict(sorted(neighborhood_analysis.items(), 
+                                          key=lambda x: x[1]['deal_count'], reverse=True)[:5])
+        
+        # Simple trend analysis
         years_sorted = sorted(yearly_trends.keys())
+        trend_analysis = {}
         if len(years_sorted) >= 2:
-            first_year_data = yearly_trends[years_sorted[0]]
-            last_year_data = yearly_trends[years_sorted[-1]]
+            first_year = yearly_trends[years_sorted[0]]
+            last_year = yearly_trends[years_sorted[-1]]
             
-            # Price trend
-            first_year_avg = first_year_data['average_price_per_sqm']
-            last_year_avg = last_year_data['average_price_per_sqm']
-            
-            if first_year_avg > 0:
-                price_trend_percentage = ((last_year_avg - first_year_avg) / first_year_avg) * 100
-                price_trend_direction = "עולה" if price_trend_percentage > 5 else "יורד" if price_trend_percentage < -5 else "יציב"
+            if first_year['avg_price_per_sqm'] > 0:
+                price_change = ((last_year['avg_price_per_sqm'] - first_year['avg_price_per_sqm']) / first_year['avg_price_per_sqm']) * 100
+                volume_change = ((last_year['deal_count'] - first_year['deal_count']) / first_year['deal_count']) * 100 if first_year['deal_count'] > 0 else 0
                 
-                # Volume trend
-                first_year_volume = first_year_data['deal_count']
-                last_year_volume = last_year_data['deal_count']
-                volume_trend_percentage = ((last_year_volume - first_year_volume) / first_year_volume) * 100 if first_year_volume > 0 else 0
-                volume_trend_direction = "עולה" if volume_trend_percentage > 10 else "יורד" if volume_trend_percentage < -10 else "יציב"
-                
-                price_trend_analysis = {
-                    "price_trend_direction": price_trend_direction,
-                    "price_trend_percentage": round(price_trend_percentage, 1),
-                    "volume_trend_direction": volume_trend_direction,
-                    "volume_trend_percentage": round(volume_trend_percentage, 1),
-                    "analysis_period": f"{years_sorted[0]} - {years_sorted[-1]}",
-                    "first_year_avg_price_per_sqm": round(first_year_avg, 0),
-                    "last_year_avg_price_per_sqm": round(last_year_avg, 0),
-                    "total_price_change": round(last_year_avg - first_year_avg, 0),
-                    "annualized_price_growth": round(price_trend_percentage / len(years_sorted), 1)
+                trend_analysis = {
+                    "price_trend_percentage": round(price_change, 1),
+                    "volume_trend_percentage": round(volume_change, 1),
+                    "first_year_avg_price_per_sqm": first_year['avg_price_per_sqm'],
+                    "last_year_avg_price_per_sqm": last_year['avg_price_per_sqm']
                 }
         
-        # Market velocity indicators
-        market_velocity = {
-            "average_deals_per_month": round(len(deals) / (years_back * 12), 1),
-            "peak_activity_quarter": max(quarterly_trends.keys(), key=lambda q: quarterly_trends[q]['deal_count']) if quarterly_trends else None,
-            "lowest_activity_quarter": min(quarterly_trends.keys(), key=lambda q: quarterly_trends[q]['deal_count']) if quarterly_trends else None
-        }
-        
-        # Price distribution analysis
-        all_prices_per_sqm = [deal.get('price_per_sqm', 0) for deal in deals if deal.get('price_per_sqm')]
-        price_distribution = {}
-        if all_prices_per_sqm:
-            sorted_prices = sorted(all_prices_per_sqm)
-            price_distribution = {
-                "25th_percentile": round(sorted_prices[len(sorted_prices)//4], 0),
-                "75th_percentile": round(sorted_prices[3*len(sorted_prices)//4], 0),
-                "price_range_iqr": round(sorted_prices[3*len(sorted_prices)//4] - sorted_prices[len(sorted_prices)//4], 0),
-                "coefficient_of_variation": round((yearly_trends[years_sorted[-1]]['price_std_dev'] / yearly_trends[years_sorted[-1]]['average_price']) * 100, 1) if years_sorted and yearly_trends[years_sorted[-1]]['average_price'] > 0 else 0
-            }
-        
+        # Return summarized analysis (NO raw deals to save tokens)
         return json.dumps({
             "analysis_parameters": {
                 "address": address,
-                "analysis_period_years": years_back,
-                "search_radius_meters": radius_meters,
-                "max_deals_analyzed": max_deals
+                "years_analyzed": years_back,
+                "radius_meters": radius_meters,
+                "deals_analyzed": len(deals)
             },
-            "market_overview": {
-                "total_deals_analyzed": len(deals),
-                "unique_neighborhoods": len(neighborhoods),
-                "unique_property_types": len(property_types),
-                "data_coverage_years": len(yearly_trends)
+            "market_summary": {
+                "total_deals": len(deals),
+                "years_with_data": len(yearly_trends),
+                "unique_property_types": len(property_type_analysis),
+                "unique_neighborhoods": len(neighborhood_analysis)
             },
             "yearly_trends": yearly_trends,
-            "quarterly_trends": quarterly_trends,
-            "property_type_analysis": property_type_analysis,
-            "neighborhood_comparison": neighborhood_analysis,
-            "market_trend_analysis": price_trend_analysis,
-            "market_velocity_indicators": market_velocity,
-            "price_distribution_analysis": price_distribution,
-            "detailed_insights": {
-                "most_active_property_type": max(property_type_analysis.keys(), key=lambda pt: property_type_analysis[pt]['deal_count']) if property_type_analysis else None,
-                "highest_value_property_type": max(property_type_analysis.keys(), key=lambda pt: property_type_analysis[pt]['average_price_per_sqm']) if property_type_analysis else None,
-                "most_expensive_neighborhood": max(neighborhood_analysis.keys(), key=lambda n: neighborhood_analysis[n]['average_price_per_sqm']) if neighborhood_analysis else None,
-                "deal_source_breakdown": f"Same building: {len([d for d in deals if d.get('deal_source') == 'same_building'])}, Street: {len([d for d in deals if d.get('deal_source') == 'street'])}, Neighborhood: {len([d for d in deals if d.get('deal_source') == 'neighborhood'])}"
+            "top_property_types": property_type_analysis,
+            "top_neighborhoods": neighborhood_analysis,
+            "trend_analysis": trend_analysis,
+            "key_insights": {
+                "most_active_year": max(yearly_trends.keys(), key=lambda y: yearly_trends[y]['deal_count']) if yearly_trends else None,
+                "highest_avg_price_year": max(yearly_trends.keys(), key=lambda y: yearly_trends[y]['avg_price_per_sqm']) if yearly_trends else None,
+                "deal_source_summary": f"Building: {len([d for d in deals if d.get('deal_source') == 'same_building'])}, Street: {len([d for d in deals if d.get('deal_source') == 'street'])}, Neighborhood: {len([d for d in deals if d.get('deal_source') == 'neighborhood'])}"
             }
         }, ensure_ascii=False, indent=2)
         
