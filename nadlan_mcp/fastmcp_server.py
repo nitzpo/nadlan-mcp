@@ -85,25 +85,55 @@ def get_deals_by_radius(latitude: float, longitude: float, radius_meters: int = 
         return f"Error fetching deals by radius: {str(e)}"
 
 @mcp.tool()
-def get_street_deals(polygon_id: str, limit: int = 100) -> str:
+def get_street_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> str:
     """Get real estate deals for a specific street polygon.
     
     Args:
         polygon_id: The polygon ID of the street/area
         limit: Maximum number of deals to return (default: 100)
+        deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
         
     Returns:
         JSON string containing recent real estate deals for the street
     """
     try:
-        deals = client.get_street_deals(polygon_id, limit)
+        deals = client.get_street_deals(polygon_id, limit, deal_type=deal_type)
         
         if not deals:
-            return f"No deals found for polygon ID {polygon_id}"
+            deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
+            return f"No {deal_type_desc} deals found for polygon ID {polygon_id}"
         
+        # Add price per sqm calculation for each deal
+        for deal in deals:
+            price = deal.get('dealAmount', 0)
+            area = deal.get('assetArea', 0)
+            if isinstance(price, (int, float)) and isinstance(area, (int, float)) and area > 0:
+                deal['price_per_sqm'] = round(price / area, 2)
+            else:
+                deal['price_per_sqm'] = None
+            # Add deal type info
+            deal['deal_type'] = deal_type
+            deal['deal_type_description'] = 'first_hand_new' if deal_type == 1 else 'second_hand_used'
+        
+        # Calculate basic statistics including price per sqm
+        prices = [deal.get("dealAmount", 0) for deal in deals if deal.get("dealAmount")]
+        price_per_sqm_values = [deal.get("price_per_sqm", 0) for deal in deals if deal.get("price_per_sqm")]
+        
+        stats = {}
+        if price_per_sqm_values:
+            stats["price_per_sqm_stats"] = {
+                "average_price_per_sqm": round(sum(price_per_sqm_values) / len(price_per_sqm_values), 0),
+                "min_price_per_sqm": round(min(price_per_sqm_values), 0),
+                "max_price_per_sqm": round(max(price_per_sqm_values), 0)
+            }
+        
+        deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
         return json.dumps({
             "total_deals": len(deals),
             "polygon_id": polygon_id,
+            "deal_type": deal_type,
+            "deal_type_description": deal_type_desc,
+            "market_statistics": stats,
             "deals": deals
         }, ensure_ascii=False, indent=2)
         
@@ -112,7 +142,7 @@ def get_street_deals(polygon_id: str, limit: int = 100) -> str:
         return f"Error fetching street deals: {str(e)}"
 
 @mcp.tool()
-def find_recent_deals_for_address(address: str, years_back: int = 2, radius_meters: int = 30, max_deals: int = 50) -> str:
+def find_recent_deals_for_address(address: str, years_back: int = 2, radius_meters: int = 30, max_deals: int = 50, deal_type: int = 2) -> str:
     """Find recent real estate deals for a specific address.
     
     Args:
@@ -121,15 +151,17 @@ def find_recent_deals_for_address(address: str, years_back: int = 2, radius_mete
         radius_meters: Search radius in meters from the address (default: 30)
                       Small radius since street deals cover the entire street anyway
         max_deals: Maximum number of deals to return (default: 50, optimized for LLM token limits)
+        deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
         
     Returns:
         JSON string containing recent real estate deals for the address
     """
     try:
-        deals = client.find_recent_deals_for_address(address, years_back, radius_meters, max_deals)
+        deals = client.find_recent_deals_for_address(address, years_back, radius_meters, max_deals, deal_type)
         
         if not deals:
-            return f"No deals found for address '{address}'"
+            deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
+            return f"No {deal_type_desc} deals found for address '{address}'"
         
         # Calculate comprehensive statistics
         prices = [deal.get("dealAmount", 0) for deal in deals if deal.get("dealAmount")]
@@ -178,12 +210,15 @@ def find_recent_deals_for_address(address: str, years_back: int = 2, radius_mete
                 "median_price_per_sqm": round(sorted(price_per_sqm_values)[len(price_per_sqm_values)//2], 0) if price_per_sqm_values else 0
             }
         
+        deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
         return json.dumps({
             "search_parameters": {
                 "address": address,
                 "years_back": years_back,
                 "radius_meters": radius_meters,
-                "max_deals": max_deals
+                "max_deals": max_deals,
+                "deal_type": deal_type,
+                "deal_type_description": deal_type_desc
             },
             "market_statistics": stats,
             "deals": deals
@@ -194,21 +229,23 @@ def find_recent_deals_for_address(address: str, years_back: int = 2, radius_mete
         return f"Error analyzing address: {str(e)}"
 
 @mcp.tool()
-def get_neighborhood_deals(polygon_id: str, limit: int = 100) -> str:
+def get_neighborhood_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> str:
     """Get real estate deals for a specific neighborhood polygon.
     
     Args:
         polygon_id: The polygon ID of the neighborhood
         limit: Maximum number of deals to return (default: 100)
+        deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
         
     Returns:
         JSON string containing recent real estate deals in the specified neighborhood
     """
     try:
-        deals = client.get_neighborhood_deals(polygon_id, limit)
+        deals = client.get_neighborhood_deals(polygon_id, limit, deal_type=deal_type)
         
         if not deals:
-            return f"No deals found for polygon ID {polygon_id}"
+            deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
+            return f"No {deal_type_desc} deals found for polygon ID {polygon_id}"
         
         # Add price per sqm calculation for each deal
         for deal in deals:
@@ -218,6 +255,9 @@ def get_neighborhood_deals(polygon_id: str, limit: int = 100) -> str:
                 deal['price_per_sqm'] = round(price / area, 2)
             else:
                 deal['price_per_sqm'] = None
+            # Add deal type info
+            deal['deal_type'] = deal_type
+            deal['deal_type_description'] = 'first_hand_new' if deal_type == 1 else 'second_hand_used'
         
         # Calculate basic statistics including price per sqm
         prices = [deal.get("dealAmount", 0) for deal in deals if deal.get("dealAmount")]
@@ -231,9 +271,12 @@ def get_neighborhood_deals(polygon_id: str, limit: int = 100) -> str:
                 "max_price_per_sqm": round(max(price_per_sqm_values), 0)
             }
         
+        deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
         return json.dumps({
             "total_deals": len(deals),
             "polygon_id": polygon_id,
+            "deal_type": deal_type,
+            "deal_type_description": deal_type_desc,
             "market_statistics": stats,
             "deals": deals
         }, ensure_ascii=False, indent=2)
@@ -243,24 +286,26 @@ def get_neighborhood_deals(polygon_id: str, limit: int = 100) -> str:
         return f"Error fetching neighborhood deals: {str(e)}"
 
 @mcp.tool()
-def analyze_market_trends(address: str, years_back: int = 3, radius_meters: int = 300, max_deals: int = 100) -> str:
+def analyze_market_trends(address: str, years_back: int = 3, radius_meters: int = 100, max_deals: int = 100, deal_type: int = 2) -> str:
     """Analyze market trends and price patterns for an area with comprehensive data.
     
     Args:
         address: The address to analyze trends around
         years_back: How many years of data to analyze (default: 3)
-        radius_meters: Search radius in meters from the address (default: 300, larger for trend analysis)
+        radius_meters: Search radius in meters from the address (default: 100, larger for trend analysis)
         max_deals: Maximum number of deals to analyze (default: 100, optimized for performance and token limits)
+        deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
         
     Returns:
         JSON string containing comprehensive market trend analysis (summarized data, not raw deals)
     """
     try:
         # Get deals for the address with larger radius for trend analysis
-        deals = client.find_recent_deals_for_address(address, years_back, radius_meters, max_deals)
+        deals = client.find_recent_deals_for_address(address, years_back, radius_meters, max_deals, deal_type)
         
         if not deals:
-            return f"No deals found for comprehensive market analysis near '{address}'"
+            deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
+            return f"No {deal_type_desc} deals found for comprehensive market analysis near '{address}'"
         
         # Efficient analysis with reduced complexity
         from collections import defaultdict
@@ -354,13 +399,17 @@ def analyze_market_trends(address: str, years_back: int = 3, radius_meters: int 
                     "last_year_avg_price_per_sqm": last_year['avg_price_per_sqm']
                 }
         
+        deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
+        
         # Return summarized analysis (NO raw deals to save tokens)
         return json.dumps({
             "analysis_parameters": {
                 "address": address,
                 "years_analyzed": years_back,
                 "radius_meters": radius_meters,
-                "deals_analyzed": len(deals)
+                "deals_analyzed": len(deals),
+                "deal_type": deal_type,
+                "deal_type_description": deal_type_desc
             },
             "market_summary": {
                 "total_deals": len(deals),

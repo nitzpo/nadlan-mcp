@@ -140,7 +140,8 @@ class GovmapClient:
             return []
 
     def get_street_deals(self, polygon_id: str, limit: int = 10,
-                        start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[Dict[str, Any]]:
+                        start_date: Optional[str] = None, end_date: Optional[str] = None, 
+                        deal_type: int = 2) -> List[Dict[str, Any]]:
         """
         Retrieve detailed information about deals on a specific street.
 
@@ -149,6 +150,7 @@ class GovmapClient:
             limit: Maximum number of deals to return (default: 10)
             start_date: Start date for search in 'YYYY-MM' format
             end_date: End date for search in 'YYYY-MM' format
+            deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
 
         Returns:
             List of detailed deal information for the street
@@ -158,14 +160,14 @@ class GovmapClient:
         """
         url = f"{self.base_url}/real-estate/street-deals/{polygon_id}"
 
-        params: Dict[str, Any] = {"limit": limit}
+        params: Dict[str, Any] = {"limit": limit, "dealType": deal_type}
         if start_date:
             params["startDate"] = start_date
         if end_date:
             params["endDate"] = end_date
 
         try:
-            logger.info(f"Getting street deals for polygon: {polygon_id}")
+            logger.info(f"Getting street deals for polygon: {polygon_id}, dealType: {deal_type}")
             response = self.session.get(url, params=params)
             response.raise_for_status()
 
@@ -183,7 +185,8 @@ class GovmapClient:
             return []
 
     def get_neighborhood_deals(self, polygon_id: str, limit: int = 10,
-                              start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[Dict[str, Any]]:
+                              start_date: Optional[str] = None, end_date: Optional[str] = None,
+                              deal_type: int = 2) -> List[Dict[str, Any]]:
         """
         Retrieve deals within the same neighborhood as the given polygon_id.
 
@@ -192,6 +195,7 @@ class GovmapClient:
             limit: Maximum number of deals to return (default: 10)
             start_date: Start date for search in 'YYYY-MM' format
             end_date: End date for search in 'YYYY-MM' format
+            deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
 
         Returns:
             List of deals in the neighborhood
@@ -201,14 +205,14 @@ class GovmapClient:
         """
         url = f"{self.base_url}/real-estate/neighborhood-deals/{polygon_id}"
 
-        params: Dict[str, Any] = {"limit": limit}
+        params: Dict[str, Any] = {"limit": limit, "dealType": deal_type}
         if start_date:
             params["startDate"] = start_date
         if end_date:
             params["endDate"] = end_date
 
         try:
-            logger.info(f"Getting neighborhood deals for polygon: {polygon_id}")
+            logger.info(f"Getting neighborhood deals for polygon: {polygon_id}, dealType: {deal_type}")
             response = self.session.get(url, params=params)
             response.raise_for_status()
 
@@ -226,7 +230,8 @@ class GovmapClient:
             return []
 
     def find_recent_deals_for_address(self, address: str, years_back: int = 2, 
-                                    radius: int = 30, max_deals: int = 50) -> List[Dict[str, Any]]:
+                                    radius: int = 30, max_deals: int = 50, 
+                                    deal_type: int = 2) -> List[Dict[str, Any]]:
         """
         Find all relevant real estate deals for a given address from the last few years.
 
@@ -238,7 +243,8 @@ class GovmapClient:
             years_back: How many years back to search (default: 2)
             radius: Search radius in meters for initial coordinate search (default: 30)
                    Small radius since street deals cover the entire street anyway
-            max_deals: Maximum number of deals to return (default: 200)
+            max_deals: Maximum number of deals to return (default: 50)
+            deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
 
         Returns:
             List of deals found for the address area, with same building deals prioritized first,
@@ -250,7 +256,7 @@ class GovmapClient:
         """
         try:
             # Step 1: Get coordinates for the address
-            logger.info(f"Starting search for address: {address}")
+            logger.info(f"Starting search for address: {address}, dealType: {deal_type}")
             autocomplete_result = self.autocomplete_address(address)
 
             if not autocomplete_result.get('results'):
@@ -306,13 +312,13 @@ class GovmapClient:
                     # Get street deals first (higher priority)
                     current_street_deals = self.get_street_deals(
                         polygon_id, limit=max_deals // 2,  # Allocate more to street deals
-                        start_date=start_date_str, end_date=end_date_str
+                        start_date=start_date_str, end_date=end_date_str, deal_type=deal_type
                     )
 
                     # Get neighborhood deals (lower priority)
                     current_neighborhood_deals = self.get_neighborhood_deals(
                         polygon_id, limit=max_deals // 4,  # Allocate less to neighborhood deals
-                        start_date=start_date_str, end_date=end_date_str
+                        start_date=start_date_str, end_date=end_date_str, deal_type=deal_type
                     )
 
                     # Process street deals and separate building deals
@@ -359,7 +365,7 @@ class GovmapClient:
             if len(all_deals) > max_deals:
                 all_deals = all_deals[:max_deals]
 
-            # Add price per square meter calculation
+            # Add price per square meter calculation and deal type info
             for deal in all_deals:
                 price = deal.get('dealAmount', 0)
                 area = deal.get('assetArea', 0)
@@ -367,9 +373,14 @@ class GovmapClient:
                     deal['price_per_sqm'] = round(price / area, 2)
                 else:
                     deal['price_per_sqm'] = None
+                
+                # Add deal type description for clarity
+                deal['deal_type'] = deal_type
+                deal['deal_type_description'] = 'first_hand_new' if deal_type == 1 else 'second_hand_used'
 
             logger.info(f"Found {len(all_deals)} total deals for address: {address} "
-                       f"(Building: {len(building_deals)}, Street: {len(street_deals)}, Neighborhood: {len(neighborhood_deals)})")
+                       f"(Building: {len(building_deals)}, Street: {len(street_deals)}, Neighborhood: {len(neighborhood_deals)}) "
+                       f"[{deal['deal_type_description'] if all_deals else 'N/A'}]")
             return all_deals
 
         except Exception as e:
