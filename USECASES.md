@@ -20,6 +20,12 @@ The nadlan-mcp MCP server provides comprehensive Israeli real estate data analys
 - **Multi-Address Comparison**: Compare real estate markets between multiple addresses side-by-side
 - **Investment Analysis**: Compare different areas for investment potential
 
+## 🏆 **Amenity Scoring & Quality of Life Analysis**
+- **Address Amenity Rating**: Score individual addresses based on proximity to essential amenities
+- **Street-level Amenity Analysis**: Rate entire streets by their access to schools, parks, healthcare, and other services
+- **Neighborhood Quality Scoring**: Comprehensive neighborhood ratings based on amenity density and accessibility
+- **Lifestyle Compatibility**: Match addresses to lifestyle preferences based on nearby amenities
+
 ## 💡 **Practical Use Cases**
 
 ### Property Valuation
@@ -42,6 +48,12 @@ The nadlan-mcp MCP server provides comprehensive Israeli real estate data analys
 - Understand recent transaction history
 - Compare multiple potential locations
 
+### Amenity-Based Location Selection
+- Score addresses based on proximity to schools, parks, healthcare facilities
+- Find family-friendly neighborhoods with high amenity scores
+- Identify areas with the best access to public transportation and services
+- Compare lifestyle compatibility across different locations
+
 ## 🗣️ **Example Queries**
 
 You can ask questions like:
@@ -51,6 +63,10 @@ You can ask questions like:
 - "Find all recent sales on [street name]"
 - "Analyze market trends around [specific address]"
 - "What's the average price per square meter in [area]?"
+- "Rate this address based on nearby amenities like schools and parks"
+- "Which street has better access to healthcare and education facilities?"
+- "Score this neighborhood for family-friendliness based on amenities"
+- "Compare amenity scores between these two addresses"
 
 ## 📋 **Available Functions**
 
@@ -70,7 +86,8 @@ The data covers recent Israeli real estate transactions and can help with:
 - Market understanding and trends
 - Comparative analysis across locations
 - Due diligence for real estate decisions
+- Amenity-based location scoring and quality of life analysis
 
 ## 🚀 **Getting Started**
 
-Simply connect to the nadlan-mcp server through your MCP client (like Cursor) and start asking questions about Israeli real estate data. The server supports both Hebrew and English addresses and provides comprehensive market analysis capabilities. 
+Simply connect to the nadlan-mcp server through your MCP client (like Cursor) and start asking questions about Israeli real estate data. The server supports both Hebrew and English addresses and provides comprehensive market analysis capabilities.
