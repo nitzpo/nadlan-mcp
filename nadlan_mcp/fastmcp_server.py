@@ -8,7 +8,7 @@ using the FastMCP library with simplified, working functions.
 
 import json
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
 from mcp.server.fastmcp import FastMCP
 from nadlan_mcp.govmap import GovmapClient
 
@@ -531,6 +531,152 @@ def compare_addresses(addresses: List[str]) -> str:
     except Exception as e:
         logger.error(f"Error in compare_addresses: {e}")
         return f"Error comparing addresses: {str(e)}"
+
+@mcp.tool()
+def get_valuation_comparables(
+    address: str,
+    years_back: int = 2,
+    property_type: Optional[str] = None,
+    min_rooms: Optional[float] = None,
+    max_rooms: Optional[float] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    min_area: Optional[float] = None,
+    max_area: Optional[float] = None,
+    min_floor: Optional[int] = None,
+    max_floor: Optional[int] = None
+) -> str:
+    """Get comparable properties for valuation analysis.
+    
+    This tool provides detailed comparable deals filtered by your criteria.
+    The LLM can then analyze these comparables and estimate property values.
+    
+    Args:
+        address: The address to find comparables for (in Hebrew or English)
+        years_back: How many years back to search (default: 2)
+        property_type: Filter by property type (e.g., "דירה", "בית", "פנטהאוז")
+        min_rooms: Minimum number of rooms
+        max_rooms: Maximum number of rooms
+        min_price: Minimum deal amount (NIS)
+        max_price: Maximum deal amount (NIS)
+        min_area: Minimum asset area (square meters)
+        max_area: Maximum asset area (square meters)
+        min_floor: Minimum floor number
+        max_floor: Maximum floor number
+        
+    Returns:
+        JSON string containing filtered comparable deals with full details
+    """
+    try:
+        # Get all deals for the address
+        deals = client.find_recent_deals_for_address(address, years_back)
+        
+        if not deals:
+            return json.dumps({
+                "address": address,
+                "years_back": years_back,
+                "comparables": [],
+                "message": "No deals found for this address"
+            }, ensure_ascii=False, indent=2)
+        
+        # Apply filters
+        filtered_deals = client.filter_deals_by_criteria(
+            deals,
+            property_type=property_type,
+            min_rooms=min_rooms,
+            max_rooms=max_rooms,
+            min_price=min_price,
+            max_price=max_price,
+            min_area=min_area,
+            max_area=max_area,
+            min_floor=min_floor,
+            max_floor=max_floor
+        )
+        
+        # Calculate statistics on filtered comparables
+        stats = client.calculate_deal_statistics(filtered_deals)
+        
+        return json.dumps({
+            "address": address,
+            "years_back": years_back,
+            "filters_applied": {
+                "property_type": property_type,
+                "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
+                "price": f"{min_price}-{max_price}" if min_price or max_price else None,
+                "area": f"{min_area}-{max_area}" if min_area or max_area else None,
+                "floor": f"{min_floor}-{max_floor}" if min_floor or max_floor else None,
+            },
+            "total_comparables": len(filtered_deals),
+            "statistics": stats,
+            "comparables": filtered_deals
+        }, ensure_ascii=False, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Error in get_valuation_comparables: {e}")
+        return f"Error getting valuation comparables: {str(e)}"
+
+@mcp.tool()
+def get_deal_statistics(
+    address: str,
+    years_back: int = 2,
+    property_type: Optional[str] = None,
+    min_rooms: Optional[float] = None,
+    max_rooms: Optional[float] = None
+) -> str:
+    """Calculate statistical aggregations on deal data for an address.
+    
+    This tool provides quick statistical summaries without returning all raw deals.
+    Useful when LLM needs calculations on large datasets without full details.
+    
+    Args:
+        address: The address to analyze (in Hebrew or English)
+        years_back: How many years back to analyze (default: 2)
+        property_type: Filter by property type (e.g., "דירה", "בית")
+        min_rooms: Minimum number of rooms
+        max_rooms: Maximum number of rooms
+        
+    Returns:
+        JSON string containing statistical metrics (mean, median, percentiles, etc.)
+    """
+    try:
+        # Get all deals for the address
+        deals = client.find_recent_deals_for_address(address, years_back)
+        
+        if not deals:
+            return json.dumps({
+                "address": address,
+                "years_back": years_back,
+                "statistics": {
+                    "count": 0,
+                    "message": "No deals found for this address"
+                }
+            }, ensure_ascii=False, indent=2)
+        
+        # Apply filters if provided
+        if property_type or min_rooms or max_rooms:
+            deals = client.filter_deals_by_criteria(
+                deals,
+                property_type=property_type,
+                min_rooms=min_rooms,
+                max_rooms=max_rooms
+            )
+        
+        # Calculate statistics
+        stats = client.calculate_deal_statistics(deals)
+        
+        return json.dumps({
+            "address": address,
+            "years_back": years_back,
+            "filters_applied": {
+                "property_type": property_type,
+                "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
+            },
+            "statistics": stats
+        }, ensure_ascii=False, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Error in get_deal_statistics: {e}")
+        return f"Error calculating deal statistics: {str(e)}"
 
 # Run the server
 if __name__ == "__main__":

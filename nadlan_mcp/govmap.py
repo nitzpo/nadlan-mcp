@@ -1,9 +1,11 @@
 import requests
 import logging
-
 import json
+import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Tuple, Optional
+
+from nadlan_mcp.config import get_config, GovmapConfig
 
 logger = logging.getLogger(__name__)
 
@@ -13,22 +15,114 @@ class GovmapClient:
     A client for interacting with the Israeli government's Govmap API.
 
     This class provides methods to search for properties, find block/parcel information,
-    and retrieve real estate deal data.
+    and retrieve real estate deal data with automatic retries and rate limiting.
+    
+    Attributes:
+        config: Configuration object with API settings
+        session: Requests session for connection pooling
+        last_request_time: Timestamp of last API request for rate limiting
     """
 
-    def __init__(self, base_url: str = "https://www.govmap.gov.il/api/"):
+    def __init__(self, config: Optional[GovmapConfig] = None):
         """
         Initialize the GovmapClient.
 
         Args:
-            base_url: The base URL for the Govmap API
+            config: Optional configuration object. If None, uses global config.
         """
-        self.base_url = base_url.rstrip('/')
+        self.config = config or get_config()
+        self.base_url = self.config.base_url.rstrip('/')
         self.session = requests.Session()
         self.session.headers.update({
             'Content-Type': 'application/json',
-            'User-Agent': 'NadlanMCP/1.0.0'
+            'User-Agent': self.config.user_agent
         })
+        self.last_request_time = 0.0
+        
+    def _rate_limit(self):
+        """
+        Enforce rate limiting by sleeping if necessary.
+        
+        Ensures requests don't exceed the configured requests_per_second.
+        """
+        min_interval = 1.0 / self.config.requests_per_second
+        elapsed = time.time() - self.last_request_time
+        if elapsed < min_interval:
+            time.sleep(min_interval - elapsed)
+        self.last_request_time = time.time()
+    
+    def _validate_address(self, address: str) -> str:
+        """
+        Validate and sanitize address input.
+        
+        Args:
+            address: Address string to validate
+            
+        Returns:
+            Sanitized address string
+            
+        Raises:
+            ValueError: If address is invalid
+        """
+        if not address or not isinstance(address, str):
+            raise ValueError("Address must be a non-empty string")
+        address = address.strip()
+        if not address:
+            raise ValueError("Address cannot be empty or whitespace only")
+        if len(address) > 500:
+            raise ValueError("Address is too long (max 500 characters)")
+        return address
+    
+    def _validate_coordinates(self, point: Tuple[float, float]) -> Tuple[float, float]:
+        """
+        Validate coordinate input.
+        
+        Args:
+            point: Tuple of (longitude, latitude)
+            
+        Returns:
+            Validated coordinate tuple
+            
+        Raises:
+            ValueError: If coordinates are invalid
+        """
+        if not isinstance(point, (tuple, list)) or len(point) != 2:
+            raise ValueError("Point must be a tuple of (longitude, latitude)")
+        try:
+            lon, lat = float(point[0]), float(point[1])
+        except (TypeError, ValueError):
+            raise ValueError("Coordinates must be numeric values")
+        
+        # Basic validation for Israeli coordinates (ITM projection)
+        if not (0 < lon < 400000):  # Rough bounds for Israeli ITM longitude
+            logger.warning(f"Longitude {lon} may be outside Israeli bounds")
+        if not (0 < lat < 1400000):  # Rough bounds for Israeli ITM latitude
+            logger.warning(f"Latitude {lat} may be outside Israeli bounds")
+            
+        return (lon, lat)
+    
+    def _validate_positive_int(self, value: int, name: str, max_value: Optional[int] = None) -> int:
+        """
+        Validate positive integer input.
+        
+        Args:
+            value: Value to validate
+            name: Name of the parameter (for error messages)
+            max_value: Optional maximum allowed value
+            
+        Returns:
+            Validated integer
+            
+        Raises:
+            ValueError: If value is invalid
+        """
+        if not isinstance(value, int):
+            raise ValueError(f"{name} must be an integer")
+        if value <= 0:
+            raise ValueError(f"{name} must be positive")
+        if max_value and value > max_value:
+            raise ValueError(f"{name} must be <= {max_value}")
+        return value
 
     def autocomplete_address(self, search_text: str) -> Dict[str, Any]:
         """
@@ -41,9 +135,10 @@ class GovmapClient:
             Dict containing the JSON response from the API with coordinates
 
         Raises:
-            requests.RequestException: If the API request fails
-            ValueError: If the response is invalid
+            requests.RequestException: If the API request fails after retries
+            ValueError: If the response is invalid or input is invalid
         """
+        search_text = self._validate_address(search_text)
         url = f"{self.base_url}/search-service/autocomplete"
 
         payload = {
@@ -53,23 +148,35 @@ class GovmapClient:
             "maxResults": 10
         }
 
-        try:
-            logger.info(f"Searching for address: {search_text}")
-            response = self.session.post(url, json=payload)
-            response.raise_for_status()
+        # Retry logic with exponential backoff
+        for attempt in range(self.config.max_retries + 1):
+            try:
+                self._rate_limit()
+                
+                logger.info(f"Searching for address: {search_text} (attempt {attempt + 1}/{self.config.max_retries + 1})")
+                timeout = (self.config.connect_timeout, self.config.read_timeout)
+                response = self.session.post(url, json=payload, timeout=timeout)
+                response.raise_for_status()
 
-            data = response.json()
-            if not data or 'results' not in data:
-                raise ValueError("Invalid response format from autocomplete API")
+                data = response.json()
+                if not data or 'results' not in data:
+                    raise ValueError("Invalid response format from autocomplete API")
 
-            return data
-
-        except requests.RequestException as e:
-            logger.error(f"Error calling autocomplete API: {e}")
-            raise
-        except json.JSONDecodeError as e:
-            logger.error(f"Error parsing JSON response: {e}")
-            raise ValueError("Invalid JSON response from API")
+                return data
+                
+            except (requests.RequestException, requests.Timeout) as e:
+                if attempt < self.config.max_retries:
+                    wait_time = min(
+                        self.config.retry_min_wait * (2 ** attempt),
+                        self.config.retry_max_wait
+                    )
+                    logger.warning(f"Request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Request failed after {self.config.max_retries + 1} attempts: {e}")
+                    raise
+        # This line should never be reached but satisfies type checker
+        raise RuntimeError("Unexpected error: retry loop exited without return or raise")
 
     def get_gush_helka(self, point: Tuple[float, float]) -> Dict[str, Any]:
         """
@@ -82,9 +189,10 @@ class GovmapClient:
             Dict containing the JSON response with block and parcel data
 
         Raises:
-            requests.RequestException: If the API request fails
-            ValueError: If the response is invalid
+            requests.RequestException: If the API request fails after retries
+            ValueError: If the response or input is invalid
         """
+        point = self._validate_coordinates(point)
         url = f"{self.base_url}/layers-catalog/entitiesByPoint"
 
         payload = {
@@ -93,20 +201,32 @@ class GovmapClient:
             "tolerance": 0
         }
 
-        try:
-            logger.info(f"Getting Gush/Helka for point: {point}")
-            response = self.session.post(url, json=payload)
-            response.raise_for_status()
+        # Retry logic with exponential backoff
+        for attempt in range(self.config.max_retries + 1):
+            try:
+                self._rate_limit()
+                
+                logger.info(f"Getting Gush/Helka for point: {point} (attempt {attempt + 1}/{self.config.max_retries + 1})")
+                timeout = (self.config.connect_timeout, self.config.read_timeout)
+                response = self.session.post(url, json=payload, timeout=timeout)
+                response.raise_for_status()
 
-            data = response.json()
-            return data
-
-        except requests.RequestException as e:
-            logger.error(f"Error calling entitiesByPoint API: {e}")
-            raise
-        except json.JSONDecodeError as e:
-            logger.error(f"Error parsing JSON response: {e}")
-            raise ValueError("Invalid JSON response from API")
+                data = response.json()
+                return data
+                
+            except (requests.RequestException, requests.Timeout) as e:
+                if attempt < self.config.max_retries:
+                    wait_time = min(
+                        self.config.retry_min_wait * (2 ** attempt),
+                        self.config.retry_max_wait
+                    )
+                    logger.warning(f"Request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Request failed after {self.config.max_retries + 1} attempts: {e}")
+                    raise
+        # This line should never be reached but satisfies type checker
+        raise RuntimeError("Unexpected error: retry loop exited without return or raise")
 
     def get_deals_by_radius(self, point: Tuple[float, float], radius: int = 50) -> List[Dict[str, Any]]:
         """
@@ -120,24 +240,41 @@ class GovmapClient:
             List of deals found within the radius
 
         Raises:
-            requests.RequestException: If the API request fails
+            requests.RequestException: If the API request fails after retries
+            ValueError: If the response or input is invalid
         """
+        point = self._validate_coordinates(point)
+        radius = self._validate_positive_int(radius, "radius", max_value=5000)
         url = f"{self.base_url}/real-estate/deals/{point[0]},{point[1]}/{radius}"
 
-        try:
-            logger.info(f"Getting deals by radius for point: {point}, radius: {radius}m")
-            response = self.session.get(url)
-            response.raise_for_status()
+        # Retry logic with exponential backoff
+        for attempt in range(self.config.max_retries + 1):
+            try:
+                self._rate_limit()
+                
+                logger.info(f"Getting deals by radius for point: {point}, radius: {radius}m (attempt {attempt + 1}/{self.config.max_retries + 1})")
+                timeout = (self.config.connect_timeout, self.config.read_timeout)
+                response = self.session.get(url, timeout=timeout)
+                response.raise_for_status()
 
-            data = response.json()
-            return data if isinstance(data, list) else []
-
-        except requests.RequestException as e:
-            logger.error(f"Error calling deals by radius API: {e}")
-            raise
-        except json.JSONDecodeError as e:
-            logger.error(f"Error parsing JSON response: {e}")
-            return []
+                data = response.json()
+                if not isinstance(data, list):
+                    raise ValueError(f"Expected list response, got {type(data).__name__}")
+                return data
+                
+            except (requests.RequestException, requests.Timeout) as e:
+                if attempt < self.config.max_retries:
+                    wait_time = min(
+                        self.config.retry_min_wait * (2 ** attempt),
+                        self.config.retry_max_wait
+                    )
+                    logger.warning(f"Request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Request failed after {self.config.max_retries + 1} attempts: {e}")
+                    raise
+        # This line should never be reached but satisfies type checker
+        raise RuntimeError("Unexpected error: retry loop exited without return or raise")
 
     def get_street_deals(self, polygon_id: str, limit: int = 10,
                         start_date: Optional[str] = None, end_date: Optional[str] = None, 
@@ -156,8 +293,19 @@ class GovmapClient:
             List of detailed deal information for the street
 
         Raises:
-            requests.RequestException: If the API request fails
+            requests.RequestException: If the API request fails after retries
+            ValueError: If the response or input is invalid
         """
+        if not polygon_id or not isinstance(polygon_id, str):
+            raise ValueError("polygon_id must be a non-empty string")
+        polygon_id = polygon_id.strip()
+        if not polygon_id:
+            raise ValueError("polygon_id cannot be empty or whitespace only")
+        
+        limit = self._validate_positive_int(limit, "limit", max_value=1000)
+        if deal_type not in (1, 2):
+            raise ValueError("deal_type must be 1 (first hand/new) or 2 (second hand/used)")
+        
         url = f"{self.base_url}/real-estate/street-deals/{polygon_id}"
 
         params: Dict[str, Any] = {"limit": limit, "dealType": deal_type}
@@ -166,23 +314,40 @@ class GovmapClient:
         if end_date:
             params["endDate"] = end_date
 
-        try:
-            logger.info(f"Getting street deals for polygon: {polygon_id}, dealType: {deal_type}")
-            response = self.session.get(url, params=params)
-            response.raise_for_status()
+        # Retry logic with exponential backoff
+        for attempt in range(self.config.max_retries + 1):
+            try:
+                self._rate_limit()
+                
+                logger.info(f"Getting street deals for polygon: {polygon_id}, dealType: {deal_type} (attempt {attempt + 1}/{self.config.max_retries + 1})")
+                timeout = (self.config.connect_timeout, self.config.read_timeout)
+                response = self.session.get(url, params=params, timeout=timeout)
+                response.raise_for_status()
 
-            data = response.json()
-            # API returns {data: [...], totalCount: ..., limit: ..., offset: ...}
-            if isinstance(data, dict) and 'data' in data:
-                return data['data'] if isinstance(data['data'], list) else []
-            return data if isinstance(data, list) else []
-
-        except requests.RequestException as e:
-            logger.error(f"Error calling street deals API: {e}")
-            raise
-        except json.JSONDecodeError as e:
-            logger.error(f"Error parsing JSON response: {e}")
-            return []
+                data = response.json()
+                # API returns {data: [...], totalCount: ..., limit: ..., offset: ...}
+                if isinstance(data, dict) and 'data' in data:
+                    if not isinstance(data['data'], list):
+                        raise ValueError(f"Expected list in 'data' field, got {type(data['data']).__name__}")
+                    return data['data']
+                elif isinstance(data, list):
+                    return data
+                else:
+                    raise ValueError(f"Unexpected response format: {type(data).__name__}")
+                
+            except (requests.RequestException, requests.Timeout) as e:
+                if attempt < self.config.max_retries:
+                    wait_time = min(
+                        self.config.retry_min_wait * (2 ** attempt),
+                        self.config.retry_max_wait
+                    )
+                    logger.warning(f"Request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Request failed after {self.config.max_retries + 1} attempts: {e}")
+                    raise
+        # This line should never be reached but satisfies type checker
+        raise RuntimeError("Unexpected error: retry loop exited without return or raise")
 
     def get_neighborhood_deals(self, polygon_id: str, limit: int = 10,
                               start_date: Optional[str] = None, end_date: Optional[str] = None,
@@ -201,8 +366,19 @@ class GovmapClient:
             List of deals in the neighborhood
 
         Raises:
-            requests.RequestException: If the API request fails
+            requests.RequestException: If the API request fails after retries
+            ValueError: If the response or input is invalid
         """
+        if not polygon_id or not isinstance(polygon_id, str):
+            raise ValueError("polygon_id must be a non-empty string")
+        polygon_id = polygon_id.strip()
+        if not polygon_id:
+            raise ValueError("polygon_id cannot be empty or whitespace only")
+        
+        limit = self._validate_positive_int(limit, "limit", max_value=1000)
+        if deal_type not in (1, 2):
+            raise ValueError("deal_type must be 1 (first hand/new) or 2 (second hand/used)")
+        
         url = f"{self.base_url}/real-estate/neighborhood-deals/{polygon_id}"
 
         params: Dict[str, Any] = {"limit": limit, "dealType": deal_type}
@@ -211,23 +387,40 @@ class GovmapClient:
         if end_date:
             params["endDate"] = end_date
 
-        try:
-            logger.info(f"Getting neighborhood deals for polygon: {polygon_id}, dealType: {deal_type}")
-            response = self.session.get(url, params=params)
-            response.raise_for_status()
+        # Retry logic with exponential backoff
+        for attempt in range(self.config.max_retries + 1):
+            try:
+                self._rate_limit()
+                
+                logger.info(f"Getting neighborhood deals for polygon: {polygon_id}, dealType: {deal_type} (attempt {attempt + 1}/{self.config.max_retries + 1})")
+                timeout = (self.config.connect_timeout, self.config.read_timeout)
+                response = self.session.get(url, params=params, timeout=timeout)
+                response.raise_for_status()
 
-            data = response.json()
-            # API returns {data: [...], totalCount: ..., limit: ..., offset: ...}
-            if isinstance(data, dict) and 'data' in data:
-                return data['data'] if isinstance(data['data'], list) else []
-            return data if isinstance(data, list) else []
-
-        except requests.RequestException as e:
-            logger.error(f"Error calling neighborhood deals API: {e}")
-            raise
-        except json.JSONDecodeError as e:
-            logger.error(f"Error parsing JSON response: {e}")
-            return []
+                data = response.json()
+                # API returns {data: [...], totalCount: ..., limit: ..., offset: ...}
+                if isinstance(data, dict) and 'data' in data:
+                    if not isinstance(data['data'], list):
+                        raise ValueError(f"Expected list in 'data' field, got {type(data['data']).__name__}")
+                    return data['data']
+                elif isinstance(data, list):
+                    return data
+                else:
+                    raise ValueError(f"Unexpected response format: {type(data).__name__}")
+                
+            except (requests.RequestException, requests.Timeout) as e:
+                if attempt < self.config.max_retries:
+                    wait_time = min(
+                        self.config.retry_min_wait * (2 ** attempt),
+                        self.config.retry_max_wait
+                    )
+                    logger.warning(f"Request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Request failed after {self.config.max_retries + 1} attempts: {e}")
+                    raise
+        # This line should never be reached but satisfies type checker
+        raise RuntimeError("Unexpected error: retry loop exited without return or raise")
 
     def find_recent_deals_for_address(self, address: str, years_back: int = 2, 
                                     radius: int = 30, max_deals: int = 50, 
@@ -251,9 +444,17 @@ class GovmapClient:
             then street deals, then neighborhood deals
 
         Raises:
-            ValueError: If address cannot be found or processed
-            requests.RequestException: If API requests fail
+            ValueError: If address cannot be found or processed, or input is invalid
+            requests.RequestException: If API requests fail after retries
         """
+        # Validate inputs
+        address = self._validate_address(address)
+        years_back = self._validate_positive_int(years_back, "years_back", max_value=50)
+        radius = self._validate_positive_int(radius, "radius", max_value=5000)
+        max_deals = self._validate_positive_int(max_deals, "max_deals", max_value=10000)
+        if deal_type not in (1, 2):
+            raise ValueError("deal_type must be 1 (first hand/new) or 2 (second hand/used)")
+        
         try:
             # Step 1: Get coordinates for the address
             logger.info(f"Starting search for address: {address}, dealType: {deal_type}")
@@ -439,3 +640,259 @@ class GovmapClient:
                 return True
                 
         return False
+    
+    def filter_deals_by_criteria(
+        self,
+        deals: List[Dict[str, Any]],
+        property_type: Optional[str] = None,
+        min_rooms: Optional[float] = None,
+        max_rooms: Optional[float] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
+        min_area: Optional[float] = None,
+        max_area: Optional[float] = None,
+        min_floor: Optional[int] = None,
+        max_floor: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Filter deals by various criteria.
+        
+        Args:
+            deals: List of deal dictionaries to filter
+            property_type: Property type to filter by (Hebrew description)
+            min_rooms: Minimum number of rooms
+            max_rooms: Maximum number of rooms
+            min_price: Minimum deal amount
+            max_price: Maximum deal amount
+            min_area: Minimum asset area (square meters)
+            max_area: Maximum asset area (square meters)
+            min_floor: Minimum floor number
+            max_floor: Maximum floor number
+            
+        Returns:
+            Filtered list of deals
+            
+        Raises:
+            ValueError: If filter criteria are invalid
+        """
+        if not isinstance(deals, list):
+            raise ValueError("deals must be a list")
+        
+        # Validate numeric ranges
+        if min_rooms is not None and max_rooms is not None and min_rooms > max_rooms:
+            raise ValueError("min_rooms cannot be greater than max_rooms")
+        if min_price is not None and max_price is not None and min_price > max_price:
+            raise ValueError("min_price cannot be greater than max_price")
+        if min_area is not None and max_area is not None and min_area > max_area:
+            raise ValueError("min_area cannot be greater than max_area")
+        if min_floor is not None and max_floor is not None and min_floor > max_floor:
+            raise ValueError("min_floor cannot be greater than max_floor")
+        
+        filtered_deals = []
+        
+        for deal in deals:
+            # Property type filter
+            if property_type is not None:
+                deal_type = deal.get('propertyTypeDescription', deal.get('assetTypeHeb', ''))
+                if property_type.lower() not in deal_type.lower():
+                    continue
+            
+            # Room count filter
+            rooms = deal.get('assetRoomNum')
+            if rooms is not None:
+                try:
+                    rooms = float(rooms)
+                    if min_rooms is not None and rooms < min_rooms:
+                        continue
+                    if max_rooms is not None and rooms > max_rooms:
+                        continue
+                except (TypeError, ValueError):
+                    pass  # Skip deals with invalid room data
+            
+            # Price filter
+            price = deal.get('dealAmount')
+            if price is not None:
+                try:
+                    price = float(price)
+                    if min_price is not None and price < min_price:
+                        continue
+                    if max_price is not None and price > max_price:
+                        continue
+                except (TypeError, ValueError):
+                    pass  # Skip deals with invalid price data
+            
+            # Area filter
+            area = deal.get('assetArea')
+            if area is not None:
+                try:
+                    area = float(area)
+                    if min_area is not None and area < min_area:
+                        continue
+                    if max_area is not None and area > max_area:
+                        continue
+                except (TypeError, ValueError):
+                    pass  # Skip deals with invalid area data
+            
+            # Floor filter
+            floor_str = deal.get('floorNo', '')
+            if floor_str and isinstance(floor_str, str):
+                # Try to extract floor number (handles Hebrew floor descriptions)
+                floor_num = self._extract_floor_number(floor_str)
+                if floor_num is not None:
+                    if min_floor is not None and floor_num < min_floor:
+                        continue
+                    if max_floor is not None and floor_num > max_floor:
+                        continue
+            
+            filtered_deals.append(deal)
+        
+        return filtered_deals
+    
+    def _extract_floor_number(self, floor_str: str) -> Optional[int]:
+        """
+        Extract numeric floor number from Hebrew floor description.
+        
+        Args:
+            floor_str: Floor description string (e.g., "שלישית", "קומה 3", "3")
+            
+        Returns:
+            Floor number or None if cannot be extracted
+        """
+        if not floor_str:
+            return None
+        
+        # Hebrew ordinal floor names to numbers
+        hebrew_floors = {
+            'קרקע': 0, 'מרתף': -1,
+            'ראשונה': 1, 'שניה': 2, 'שלישית': 3, 'רביעית': 4,
+            'חמישית': 5, 'שישית': 6, 'שביעית': 7, 'שמינית': 8,
+            'תשיעית': 9, 'עשירית': 10
+        }
+        
+        floor_lower = floor_str.lower().strip()
+        
+        # Check for direct match with Hebrew names
+        for heb, num in hebrew_floors.items():
+            if heb in floor_lower:
+                return num
+        
+        # Try to extract number from string
+        import re
+        numbers = re.findall(r'\d+', floor_str)
+        if numbers:
+            try:
+                return int(numbers[0])
+            except ValueError:
+                pass
+        
+        return None
+    
+    def calculate_deal_statistics(
+        self,
+        deals: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Calculate statistical aggregations on deal data.
+        
+        Args:
+            deals: List of deal dictionaries
+            
+        Returns:
+            Dictionary with statistical metrics
+            
+        Raises:
+            ValueError: If deals is not a valid list
+        """
+        if not isinstance(deals, list):
+            raise ValueError("deals must be a list")
+        
+        if not deals:
+            return {
+                "count": 0,
+                "price_stats": {},
+                "area_stats": {},
+                "price_per_sqm_stats": {},
+                "room_distribution": {}
+            }
+        
+        # Extract numeric values
+        prices = []
+        areas = []
+        price_per_sqm_values = []
+        rooms = []
+        
+        for deal in deals:
+            price = deal.get('dealAmount')
+            if isinstance(price, (int, float)) and price > 0:
+                prices.append(price)
+            
+            area = deal.get('assetArea')
+            if isinstance(area, (int, float)) and area > 0:
+                areas.append(area)
+            
+            pps = deal.get('price_per_sqm')
+            if pps is None and price and area and area > 0:
+                pps = price / area
+            if isinstance(pps, (int, float)) and pps > 0:
+                price_per_sqm_values.append(pps)
+            
+            room_count = deal.get('assetRoomNum')
+            if isinstance(room_count, (int, float)):
+                rooms.append(room_count)
+        
+        # Calculate statistics
+        stats: Dict[str, Any] = {"count": len(deals)}
+        
+        # Price statistics
+        if prices:
+            sorted_prices = sorted(prices)
+            stats["price_stats"] = {
+                "mean": round(sum(prices) / len(prices), 2),
+                "median": sorted_prices[len(sorted_prices) // 2],
+                "min": min(prices),
+                "max": max(prices),
+                "p25": sorted_prices[len(sorted_prices) // 4],
+                "p75": sorted_prices[(3 * len(sorted_prices)) // 4],
+                "std_dev": round(self._calculate_std_dev(prices), 2) if len(prices) > 1 else 0,
+                "total": sum(prices)
+            }
+        
+        # Area statistics
+        if areas:
+            sorted_areas = sorted(areas)
+            stats["area_stats"] = {
+                "mean": round(sum(areas) / len(areas), 2),
+                "median": sorted_areas[len(sorted_areas) // 2],
+                "min": min(areas),
+                "max": max(areas),
+                "p25": sorted_areas[len(sorted_areas) // 4],
+                "p75": sorted_areas[(3 * len(sorted_areas)) // 4]
+            }
+        
+        # Price per sqm statistics
+        if price_per_sqm_values:
+            sorted_pps = sorted(price_per_sqm_values)
+            stats["price_per_sqm_stats"] = {
+                "mean": round(sum(price_per_sqm_values) / len(price_per_sqm_values), 2),
+                "median": round(sorted_pps[len(sorted_pps) // 2], 2),
+                "min": round(min(price_per_sqm_values), 2),
+                "max": round(max(price_per_sqm_values), 2),
+                "p25": round(sorted_pps[len(sorted_pps) // 4], 2),
+                "p75": round(sorted_pps[(3 * len(sorted_pps)) // 4], 2)
+            }
+        
+        # Room distribution
+        if rooms:
+            from collections import Counter
+            room_counts = Counter(rooms)
+            stats["room_distribution"] = dict(sorted(room_counts.items()))
+        
+        return stats
+    
+    def _calculate_std_dev(self, values: List[float]) -> float:
+        """Calculate standard deviation of a list of values."""
+        if len(values) < 2:
+            return 0.0
+        mean = sum(values) / len(values)
+        variance = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
+        return variance ** 0.5
