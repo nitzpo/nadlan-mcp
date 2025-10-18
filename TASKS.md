@@ -21,16 +21,17 @@ This document tracks the implementation progress of the Nadlan-MCP improvement p
 ### Cleanup
 - ✅ Deleted redundant mcp_server_concept.py file
 
+### Phase 2.1: Property Valuation Data Provision
+- ✅ Created `filter_deals_by_criteria()` function with comprehensive filtering
+- ✅ Created `calculate_deal_statistics()` helper for statistical aggregations
+- ✅ Created `_extract_floor_number()` helper for Hebrew floor parsing
+- ✅ Created `_calculate_std_dev()` for standard deviation
+- ✅ Added MCP tool: `get_valuation_comparables`
+- ✅ Added MCP tool: `get_deal_statistics`
+
 ## 🚧 In Progress
 
 ### Phase 2: Missing Core Functionality
-
-#### 2.1 Property Valuation Data Provision
-- [ ] Create `get_comparable_properties()` function with flexible filtering
-- [ ] Create `get_deal_statistics()` helper for statistical aggregations
-- [ ] Add MCP tool: `get_valuation_comparables`
-- [ ] Add MCP tool: `get_deal_statistics`
-- [ ] Update documentation with valuation tool usage
 
 #### 2.2 Market Activity & Investment Analysis  
 - [ ] Create `market_analysis.py` module
@@ -41,13 +42,13 @@ This document tracks the implementation progress of the Nadlan-MCP improvement p
 - [ ] Update documentation
 
 #### 2.3 Enhanced Deal Filtering & Search
-- [ ] Implement `filter_deals_by_criteria()` in govmap.py
-- [ ] Add property type filtering
-- [ ] Add room count filtering  
-- [ ] Add price range filtering
-- [ ] Add area range filtering
-- [ ] Add floor range filtering
-- [ ] Update existing functions to support new filters
+- ✅ Implement `filter_deals_by_criteria()` in govmap.py
+- ✅ Add property type filtering
+- ✅ Add room count filtering  
+- ✅ Add price range filtering
+- ✅ Add area range filtering
+- ✅ Add floor range filtering (with Hebrew floor name parsing)
+- [ ] Update existing functions to support new filters (integration)
 - [ ] Add tests for filtering logic
 
 ## 📋 To-Do (Next Priority)
@@ -211,27 +212,36 @@ This document tracks the implementation progress of the Nadlan-MCP improvement p
 
 ## 📊 Progress Summary
 
-**Overall Progress:** ~15% complete
+**Overall Progress:** ~40% complete
 
 ### By Phase:
 - Phase 1 (Code Quality): ✅ 100% complete
-- Phase 2 (Core Features): 🚧 0% complete
+- Phase 2.1 (Valuation Data): ✅ 100% complete
+- Phase 2.2 (Market Analysis): 📋 0% started
+- Phase 2.3 (Enhanced Filtering): ✅ 85% complete (integration & tests pending)
 - Phase 3 (Architecture): 📋 0% started
 - Phase 4 (Testing): 📋 0% started
-- Phase 5 (Documentation): 🚧 20% complete (USECASES, ARCHITECTURE done)
+- Phase 5 (Documentation): 🚧 30% complete (USECASES, ARCHITECTURE, TASKS done)
 - Phase 6 (Polish): 🚧 33% complete (cleanup done, linting pending)
 - Phase 7 (Future): 📋 Backlog
 
 ### High Priority (MVP) Status:
 - ✅ Phase 1: Code Quality & Reliability - COMPLETE
-- 🚧 Phase 2: Missing Core Functionality - IN PROGRESS (next focus)
-- 📋 Phase 6.1: Cleanup - COMPLETE
+- ✅ Phase 2.1: Property Valuation Data Provision - COMPLETE
+- 🚧 Phase 2.2: Market Analysis - NEXT PRIORITY
+- 🚧 Phase 2.3: Enhanced Filtering - MOSTLY COMPLETE (tests pending)
 
 ## 🎯 Current Sprint Focus
 
-1. **Implement valuation data provision tools** (Phase 2.1)
-2. **Implement market analysis tools** (Phase 2.2)
-3. **Implement enhanced filtering** (Phase 2.3)
+1. ✅ **Implement valuation data provision tools** (Phase 2.1) - COMPLETE
+2. **Implement market analysis tools** (Phase 2.2) - NEXT
+3. ✅ **Implement enhanced filtering** (Phase 2.3) - MOSTLY COMPLETE
+
+## 🎯 Next Sprint
+
+1. **Implement market activity metrics** (Phase 2.2)
+2. **Add tests for new filtering and valuation features** (Phase 4.1)
+3. **Create additional documentation files** (Phase 5.1)
 
 ## Notes
 

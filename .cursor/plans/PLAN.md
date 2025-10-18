@@ -450,23 +450,33 @@ Implement comprehensive amenity scoring using multiple data sources:
 - Always return structured data that LLMs can easily process
 - Use `summarized_response: bool = False` for optional summarization
 
-### To-dos
+## Implementation Tracking
 
-- [ ] Add retry logic, rate limiting, and standardize error handling in govmap.py and fastmcp_server.py
-- [ ] Create config.py with externalized configuration and environment variable support
-- [ ] Update USECASES.md and README.md to reflect actual current state and future roadmap
-- [ ] Create tools for providing comparable deals and statistical data for LLM valuation
-- [ ] Create market activity scoring and investment analysis functions
-- [ ] Add comprehensive deal filtering by property type, rooms, price, area, floor
-- [ ] Create Pydantic models for Deal, Address, MarketAnalysis, PropertyValuation
-- [ ] Separate concerns: create api_client.py, analyzers package, thin fastmcp_server.py
-- [ ] Update all tools with summarized_response boolean parameter and consistent responses
-- [ ] Add integration tests, edge cases, parametrized tests for all functionality
-- [ ] Create test_validation.py with input validation and data model tests
-- [ ] Create ARCHITECTURE.md, DEPLOYMENT.md, CONTRIBUTING.md, API_REFERENCE.md, CLAUDE.md
-- [ ] Add module docstrings, comprehensive function docs, type hints, inline comments
-- [ ] Create examples/ directory with scripts showing all major use cases
-- [ ] Add status indicators, priority levels, timeline to USECASES.md
-- [ ] Delete/integrate mcp_server_concept.py, remove unused imports, consolidate duplicates
-- [ ] Setup pre-commit hooks, format all code, fix linter warnings, add mypy
-- [ ] Update requirements.txt with new dependencies, create requirements-dev.txt, pin versions
+**For detailed task tracking and current progress, see [TASKS.md](../../TASKS.md)**
+
+### Completed (Phase 1)
+- ✅ Configuration management system with environment variable support
+- ✅ Retry logic with exponential backoff (manual implementation)
+- ✅ Rate limiting protection
+- ✅ Standardized error handling (raise exceptions)
+- ✅ Comprehensive input validation
+- ✅ Updated dependencies with version pinning
+- ✅ Created requirements-dev.txt
+- ✅ Updated USECASES.md with status indicators
+- ✅ Created ARCHITECTURE.md
+- ✅ Deleted redundant code files
+
+### Completed (Phase 2.1)
+- ✅ Implemented `filter_deals_by_criteria()` with comprehensive filtering
+- ✅ Implemented `calculate_deal_statistics()` with statistical aggregations
+- ✅ Added `get_valuation_comparables` MCP tool
+- ✅ Added `get_deal_statistics` MCP tool
+
+### In Progress
+- 🚧 Phase 2.2: Market Activity & Investment Analysis
+- 🚧 Phase 2.3: Enhanced Deal Filtering (partially complete)
+
+### Next Up
+- Phase 3: Architecture Improvements (data models, separation of concerns)
+- Phase 4: Testing Expansion
+- Phase 5: Complete Documentation
