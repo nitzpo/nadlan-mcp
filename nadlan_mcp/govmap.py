@@ -1,11 +1,12 @@
-import requests
 import logging
-import json
+import re
 import time
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Tuple, Optional
+from collections import Counter
+from typing import Any, Dict, List, Optional, Tuple
 
-from nadlan_mcp.config import get_config, GovmapConfig
+import requests
+
+from nadlan_mcp.config import GovmapConfig, get_config
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ class GovmapClient:
 
     This class provides methods to search for properties, find block/parcel information,
     and retrieve real estate deal data with automatic retries and rate limiting.
-    
+
     Attributes:
         config: Configuration object with API settings
         session: Requests session for connection pooling
@@ -31,18 +32,17 @@ class GovmapClient:
             config: Optional configuration object. If None, uses global config.
         """
         self.config = config or get_config()
-        self.base_url = self.config.base_url.rstrip('/')
+        self.base_url = self.config.base_url.rstrip("/")
         self.session = requests.Session()
-        self.session.headers.update({
-            'Content-Type': 'application/json',
-            'User-Agent': self.config.user_agent
-        })
+        self.session.headers.update(
+            {"Content-Type": "application/json", "User-Agent": self.config.user_agent}
+        )
         self.last_request_time = 0.0
-        
+
     def _rate_limit(self):
         """
         Enforce rate limiting by sleeping if necessary.
-        
+
         Ensures requests don't exceed the configured requests_per_second.
         """
         min_interval = 1.0 / self.config.requests_per_second
@@ -50,17 +50,17 @@ class GovmapClient:
         if elapsed < min_interval:
             time.sleep(min_interval - elapsed)
         self.last_request_time = time.time()
-    
+
     def _validate_address(self, address: str) -> str:
         """
         Validate and sanitize address input.
-        
+
         Args:
             address: Address string to validate
-            
+
         Returns:
             Sanitized address string
-            
+
         Raises:
             ValueError: If address is invalid
         """
@@ -72,17 +72,17 @@ class GovmapClient:
         if len(address) > 500:
             raise ValueError("Address is too long (max 500 characters)")
         return address
-    
+
     def _validate_coordinates(self, point: Tuple[float, float]) -> Tuple[float, float]:
         """
         Validate coordinate input.
-        
+
         Args:
             point: Tuple of (longitude, latitude)
-            
+
         Returns:
             Validated coordinate tuple
-            
+
         Raises:
             ValueError: If coordinates are invalid
         """
@@ -92,27 +92,29 @@ class GovmapClient:
             lon, lat = float(point[0]), float(point[1])
         except (TypeError, ValueError):
             raise ValueError("Coordinates must be numeric values")
-        
+
         # Basic validation for Israeli coordinates (ITM projection)
         if not (0 < lon < 400000):  # Rough bounds for Israeli ITM longitude
             logger.warning(f"Longitude {lon} may be outside Israeli bounds")
         if not (0 < lat < 1400000):  # Rough bounds for Israeli ITM latitude
             logger.warning(f"Latitude {lat} may be outside Israeli bounds")
-            
+
         return (lon, lat)
-    
-    def _validate_positive_int(self, value: int, name: str, max_value: Optional[int] = None) -> int:
+
+    def _validate_positive_int(
+        self, value: int, name: str, max_value: Optional[int] = None
+    ) -> int:
         """
         Validate positive integer input.
-        
+
         Args:
             value: Value to validate
             name: Name of the parameter (for error messages)
             max_value: Optional maximum allowed value
-            
+
         Returns:
             Validated integer
-            
+
         Raises:
             ValueError: If value is invalid
         """
@@ -145,38 +147,46 @@ class GovmapClient:
             "searchText": search_text,
             "language": "he",
             "isAccurate": False,
-            "maxResults": 10
+            "maxResults": 10,
         }
 
         # Retry logic with exponential backoff
         for attempt in range(self.config.max_retries + 1):
             try:
                 self._rate_limit()
-                
-                logger.info(f"Searching for address: {search_text} (attempt {attempt + 1}/{self.config.max_retries + 1})")
+
+                logger.info(
+                    f"Searching for address: {search_text} (attempt {attempt + 1}/{self.config.max_retries + 1})"
+                )
                 timeout = (self.config.connect_timeout, self.config.read_timeout)
                 response = self.session.post(url, json=payload, timeout=timeout)
                 response.raise_for_status()
 
                 data = response.json()
-                if not data or 'results' not in data:
+                if not data or "results" not in data:
                     raise ValueError("Invalid response format from autocomplete API")
 
                 return data
-                
+
             except (requests.RequestException, requests.Timeout) as e:
                 if attempt < self.config.max_retries:
                     wait_time = min(
-                        self.config.retry_min_wait * (2 ** attempt),
-                        self.config.retry_max_wait
+                        self.config.retry_min_wait * (2**attempt),
+                        self.config.retry_max_wait,
                     )
-                    logger.warning(f"Request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}")
+                    logger.warning(
+                        f"Request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}"
+                    )
                     time.sleep(wait_time)
                 else:
-                    logger.error(f"Request failed after {self.config.max_retries + 1} attempts: {e}")
+                    logger.error(
+                        f"Request failed after {self.config.max_retries + 1} attempts: {e}"
+                    )
                     raise
         # This line should never be reached but satisfies type checker
-        raise RuntimeError("Unexpected error: retry loop exited without return or raise")
+        raise RuntimeError(
+            "Unexpected error: retry loop exited without return or raise"
+        )
 
     def get_gush_helka(self, point: Tuple[float, float]) -> Dict[str, Any]:
         """
@@ -195,40 +205,46 @@ class GovmapClient:
         point = self._validate_coordinates(point)
         url = f"{self.base_url}/layers-catalog/entitiesByPoint"
 
-        payload = {
-            "point": list(point),
-            "layers": [{"layerId": "16"}],
-            "tolerance": 0
-        }
+        payload = {"point": list(point), "layers": [{"layerId": "16"}], "tolerance": 0}
 
         # Retry logic with exponential backoff
         for attempt in range(self.config.max_retries + 1):
             try:
                 self._rate_limit()
-                
-                logger.info(f"Getting Gush/Helka for point: {point} (attempt {attempt + 1}/{self.config.max_retries + 1})")
+
+                logger.info(
+                    f"Getting Gush/Helka for point: {point} (attempt {attempt + 1}/{self.config.max_retries + 1})"
+                )
                 timeout = (self.config.connect_timeout, self.config.read_timeout)
                 response = self.session.post(url, json=payload, timeout=timeout)
                 response.raise_for_status()
 
                 data = response.json()
                 return data
-                
+
             except (requests.RequestException, requests.Timeout) as e:
                 if attempt < self.config.max_retries:
                     wait_time = min(
-                        self.config.retry_min_wait * (2 ** attempt),
-                        self.config.retry_max_wait
+                        self.config.retry_min_wait * (2**attempt),
+                        self.config.retry_max_wait,
                     )
-                    logger.warning(f"Request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}")
+                    logger.warning(
+                        f"Request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}"
+                    )
                     time.sleep(wait_time)
                 else:
-                    logger.error(f"Request failed after {self.config.max_retries + 1} attempts: {e}")
+                    logger.error(
+                        f"Request failed after {self.config.max_retries + 1} attempts: {e}"
+                    )
                     raise
         # This line should never be reached but satisfies type checker
-        raise RuntimeError("Unexpected error: retry loop exited without return or raise")
+        raise RuntimeError(
+            "Unexpected error: retry loop exited without return or raise"
+        )
 
-    def get_deals_by_radius(self, point: Tuple[float, float], radius: int = 50) -> List[Dict[str, Any]]:
+    def get_deals_by_radius(
+        self, point: Tuple[float, float], radius: int = 50
+    ) -> List[Dict[str, Any]]:
         """
         Find real estate deals within a specified radius of a point.
 
@@ -251,34 +267,49 @@ class GovmapClient:
         for attempt in range(self.config.max_retries + 1):
             try:
                 self._rate_limit()
-                
-                logger.info(f"Getting deals by radius for point: {point}, radius: {radius}m (attempt {attempt + 1}/{self.config.max_retries + 1})")
+
+                logger.info(
+                    f"Getting deals by radius for point: {point}, radius: {radius}m (attempt {attempt + 1}/{self.config.max_retries + 1})"
+                )
                 timeout = (self.config.connect_timeout, self.config.read_timeout)
                 response = self.session.get(url, timeout=timeout)
                 response.raise_for_status()
 
                 data = response.json()
                 if not isinstance(data, list):
-                    raise ValueError(f"Expected list response, got {type(data).__name__}")
+                    raise ValueError(
+                        f"Expected list response, got {type(data).__name__}"
+                    )
                 return data
-                
+
             except (requests.RequestException, requests.Timeout) as e:
                 if attempt < self.config.max_retries:
                     wait_time = min(
-                        self.config.retry_min_wait * (2 ** attempt),
-                        self.config.retry_max_wait
+                        self.config.retry_min_wait * (2**attempt),
+                        self.config.retry_max_wait,
                     )
-                    logger.warning(f"Request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}")
+                    logger.warning(
+                        f"Request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}"
+                    )
                     time.sleep(wait_time)
                 else:
-                    logger.error(f"Request failed after {self.config.max_retries + 1} attempts: {e}")
+                    logger.error(
+                        f"Request failed after {self.config.max_retries + 1} attempts: {e}"
+                    )
                     raise
         # This line should never be reached but satisfies type checker
-        raise RuntimeError("Unexpected error: retry loop exited without return or raise")
+        raise RuntimeError(
+            "Unexpected error: retry loop exited without return or raise"
+        )
 
-    def get_street_deals(self, polygon_id: str, limit: int = 10,
-                        start_date: Optional[str] = None, end_date: Optional[str] = None, 
-                        deal_type: int = 2) -> List[Dict[str, Any]]:
+    def get_street_deals(
+        self,
+        polygon_id: str,
+        limit: int = 10,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        deal_type: int = 2,
+    ) -> List[Dict[str, Any]]:
         """
         Retrieve detailed information about deals on a specific street.
 
@@ -301,11 +332,13 @@ class GovmapClient:
         polygon_id = polygon_id.strip()
         if not polygon_id:
             raise ValueError("polygon_id cannot be empty or whitespace only")
-        
+
         limit = self._validate_positive_int(limit, "limit", max_value=1000)
         if deal_type not in (1, 2):
-            raise ValueError("deal_type must be 1 (first hand/new) or 2 (second hand/used)")
-        
+            raise ValueError(
+                "deal_type must be 1 (first hand/new) or 2 (second hand/used)"
+            )
+
         url = f"{self.base_url}/real-estate/street-deals/{polygon_id}"
 
         params: Dict[str, Any] = {"limit": limit, "dealType": deal_type}
@@ -318,40 +351,57 @@ class GovmapClient:
         for attempt in range(self.config.max_retries + 1):
             try:
                 self._rate_limit()
-                
-                logger.info(f"Getting street deals for polygon: {polygon_id}, dealType: {deal_type} (attempt {attempt + 1}/{self.config.max_retries + 1})")
+
+                logger.info(
+                    f"Getting street deals for polygon: {polygon_id}, dealType: {deal_type} (attempt {attempt + 1}/{self.config.max_retries + 1})"
+                )
                 timeout = (self.config.connect_timeout, self.config.read_timeout)
                 response = self.session.get(url, params=params, timeout=timeout)
                 response.raise_for_status()
 
                 data = response.json()
                 # API returns {data: [...], totalCount: ..., limit: ..., offset: ...}
-                if isinstance(data, dict) and 'data' in data:
-                    if not isinstance(data['data'], list):
-                        raise ValueError(f"Expected list in 'data' field, got {type(data['data']).__name__}")
-                    return data['data']
+                if isinstance(data, dict) and "data" in data:
+                    if not isinstance(data["data"], list):
+                        raise ValueError(
+                            f"Expected list in 'data' field, got {type(data['data']).__name__}"
+                        )
+                    return data["data"]
                 elif isinstance(data, list):
                     return data
                 else:
-                    raise ValueError(f"Unexpected response format: {type(data).__name__}")
-                
+                    raise ValueError(
+                        f"Unexpected response format: {type(data).__name__}"
+                    )
+
             except (requests.RequestException, requests.Timeout) as e:
                 if attempt < self.config.max_retries:
                     wait_time = min(
-                        self.config.retry_min_wait * (2 ** attempt),
-                        self.config.retry_max_wait
+                        self.config.retry_min_wait * (2**attempt),
+                        self.config.retry_max_wait,
                     )
-                    logger.warning(f"Request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}")
+                    logger.warning(
+                        f"Request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}"
+                    )
                     time.sleep(wait_time)
                 else:
-                    logger.error(f"Request failed after {self.config.max_retries + 1} attempts: {e}")
+                    logger.error(
+                        f"Request failed after {self.config.max_retries + 1} attempts: {e}"
+                    )
                     raise
         # This line should never be reached but satisfies type checker
-        raise RuntimeError("Unexpected error: retry loop exited without return or raise")
+        raise RuntimeError(
+            "Unexpected error: retry loop exited without return or raise"
+        )
 
-    def get_neighborhood_deals(self, polygon_id: str, limit: int = 10,
-                              start_date: Optional[str] = None, end_date: Optional[str] = None,
-                              deal_type: int = 2) -> List[Dict[str, Any]]:
+    def get_neighborhood_deals(
+        self,
+        polygon_id: str,
+        limit: int = 10,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        deal_type: int = 2,
+    ) -> List[Dict[str, Any]]:
         """
         Retrieve deals within the same neighborhood as the given polygon_id.
 
@@ -374,11 +424,13 @@ class GovmapClient:
         polygon_id = polygon_id.strip()
         if not polygon_id:
             raise ValueError("polygon_id cannot be empty or whitespace only")
-        
+
         limit = self._validate_positive_int(limit, "limit", max_value=1000)
         if deal_type not in (1, 2):
-            raise ValueError("deal_type must be 1 (first hand/new) or 2 (second hand/used)")
-        
+            raise ValueError(
+                "deal_type must be 1 (first hand/new) or 2 (second hand/used)"
+            )
+
         url = f"{self.base_url}/real-estate/neighborhood-deals/{polygon_id}"
 
         params: Dict[str, Any] = {"limit": limit, "dealType": deal_type}
@@ -391,40 +443,57 @@ class GovmapClient:
         for attempt in range(self.config.max_retries + 1):
             try:
                 self._rate_limit()
-                
-                logger.info(f"Getting neighborhood deals for polygon: {polygon_id}, dealType: {deal_type} (attempt {attempt + 1}/{self.config.max_retries + 1})")
+
+                logger.info(
+                    f"Getting neighborhood deals for polygon: {polygon_id}, dealType: {deal_type} (attempt {attempt + 1}/{self.config.max_retries + 1})"
+                )
                 timeout = (self.config.connect_timeout, self.config.read_timeout)
                 response = self.session.get(url, params=params, timeout=timeout)
                 response.raise_for_status()
 
                 data = response.json()
                 # API returns {data: [...], totalCount: ..., limit: ..., offset: ...}
-                if isinstance(data, dict) and 'data' in data:
-                    if not isinstance(data['data'], list):
-                        raise ValueError(f"Expected list in 'data' field, got {type(data['data']).__name__}")
-                    return data['data']
+                if isinstance(data, dict) and "data" in data:
+                    if not isinstance(data["data"], list):
+                        raise ValueError(
+                            f"Expected list in 'data' field, got {type(data['data']).__name__}"
+                        )
+                    return data["data"]
                 elif isinstance(data, list):
                     return data
                 else:
-                    raise ValueError(f"Unexpected response format: {type(data).__name__}")
-                
+                    raise ValueError(
+                        f"Unexpected response format: {type(data).__name__}"
+                    )
+
             except (requests.RequestException, requests.Timeout) as e:
                 if attempt < self.config.max_retries:
                     wait_time = min(
-                        self.config.retry_min_wait * (2 ** attempt),
-                        self.config.retry_max_wait
+                        self.config.retry_min_wait * (2**attempt),
+                        self.config.retry_max_wait,
                     )
-                    logger.warning(f"Request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}")
+                    logger.warning(
+                        f"Request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}"
+                    )
                     time.sleep(wait_time)
                 else:
-                    logger.error(f"Request failed after {self.config.max_retries + 1} attempts: {e}")
+                    logger.error(
+                        f"Request failed after {self.config.max_retries + 1} attempts: {e}"
+                    )
                     raise
         # This line should never be reached but satisfies type checker
-        raise RuntimeError("Unexpected error: retry loop exited without return or raise")
+        raise RuntimeError(
+            "Unexpected error: retry loop exited without return or raise"
+        )
 
-    def find_recent_deals_for_address(self, address: str, years_back: int = 2, 
-                                    radius: int = 30, max_deals: int = 50, 
-                                    deal_type: int = 2) -> List[Dict[str, Any]]:
+    def find_recent_deals_for_address(
+        self,
+        address: str,
+        years_back: int = 2,
+        radius: int = 30,
+        max_deals: int = 50,
+        deal_type: int = 2,
+    ) -> List[Dict[str, Any]]:
         """
         Find all relevant real estate deals for a given address from the last few years.
 
@@ -453,25 +522,29 @@ class GovmapClient:
         radius = self._validate_positive_int(radius, "radius", max_value=5000)
         max_deals = self._validate_positive_int(max_deals, "max_deals", max_value=10000)
         if deal_type not in (1, 2):
-            raise ValueError("deal_type must be 1 (first hand/new) or 2 (second hand/used)")
-        
+            raise ValueError(
+                "deal_type must be 1 (first hand/new) or 2 (second hand/used)"
+            )
+
         try:
             # Step 1: Get coordinates for the address
-            logger.info(f"Starting search for address: {address}, dealType: {deal_type}")
+            logger.info(
+                f"Starting search for address: {address}, dealType: {deal_type}"
+            )
             autocomplete_result = self.autocomplete_address(address)
 
-            if not autocomplete_result.get('results'):
+            if not autocomplete_result.get("results"):
                 raise ValueError(f"No results found for address: {address}")
 
             # Get the best match (first result)
-            best_match = autocomplete_result['results'][0]
-            if 'shape' not in best_match:
+            best_match = autocomplete_result["results"][0]
+            if "shape" not in best_match:
                 raise ValueError("No coordinates found in autocomplete result")
 
             # Parse coordinates from WKT POINT string
             # Format: "POINT(longitude latitude)"
-            shape_str = best_match['shape']
-            if not shape_str.startswith('POINT('):
+            shape_str = best_match["shape"]
+            if not shape_str.startswith("POINT("):
                 raise ValueError("Invalid coordinate format in autocomplete result")
 
             # Extract coordinates from "POINT(x y)"
@@ -490,16 +563,16 @@ class GovmapClient:
             # Extract unique polygon IDs
             polygon_ids = set()
             for deal in nearby_deals:
-                if 'polygon_id' in deal:
-                    polygon_ids.add(str(deal['polygon_id']))
+                if "polygon_id" in deal:
+                    polygon_ids.add(str(deal["polygon_id"]))
 
             logger.info(f"Found {len(polygon_ids)} unique polygon IDs")
 
             # Step 3: Calculate date range
             end_date = datetime.now()
             start_date = end_date - timedelta(days=years_back * 365)
-            start_date_str = start_date.strftime('%Y-%m')
-            end_date_str = end_date.strftime('%Y-%m')
+            start_date_str = start_date.strftime("%Y-%m")
+            end_date_str = end_date.strftime("%Y-%m")
 
             # Step 4: Get street and neighborhood deals for each polygon
             # Prioritize: same building (0) > street deals (1) > neighborhood deals (2)
@@ -512,14 +585,20 @@ class GovmapClient:
                 try:
                     # Get street deals first (higher priority)
                     current_street_deals = self.get_street_deals(
-                        polygon_id, limit=max_deals // 2,  # Allocate more to street deals
-                        start_date=start_date_str, end_date=end_date_str, deal_type=deal_type
+                        polygon_id,
+                        limit=max_deals // 2,  # Allocate more to street deals
+                        start_date=start_date_str,
+                        end_date=end_date_str,
+                        deal_type=deal_type,
                     )
 
                     # Get neighborhood deals (lower priority)
                     current_neighborhood_deals = self.get_neighborhood_deals(
-                        polygon_id, limit=max_deals // 4,  # Allocate less to neighborhood deals
-                        start_date=start_date_str, end_date=end_date_str, deal_type=deal_type
+                        polygon_id,
+                        limit=max_deals // 4,  # Allocate less to neighborhood deals
+                        start_date=start_date_str,
+                        end_date=end_date_str,
+                        deal_type=deal_type,
                     )
 
                     # Process street deals and separate building deals
@@ -527,17 +606,19 @@ class GovmapClient:
                         deal_id = f"{deal.get('dealId', '')}{deal.get('address', '')}{deal.get('dealDate', '')}"
                         if deal_id not in seen_deals:
                             seen_deals.add(deal_id)
-                            deal['source_polygon_id'] = polygon_id
-                            deal['deal_source'] = 'street'
-                            
+                            deal["source_polygon_id"] = polygon_id
+                            deal["deal_source"] = "street"
+
                             # Check if this is from the same building
-                            deal_address = deal.get('address', '').lower().strip()
-                            if self._is_same_building(search_address_normalized, deal_address):
-                                deal['deal_source'] = 'same_building'
-                                deal['priority'] = 0  # Highest priority
+                            deal_address = deal.get("address", "").lower().strip()
+                            if self._is_same_building(
+                                search_address_normalized, deal_address
+                            ):
+                                deal["deal_source"] = "same_building"
+                                deal["priority"] = 0  # Highest priority
                                 building_deals.append(deal)
                             else:
-                                deal['priority'] = 1  # Street deals priority
+                                deal["priority"] = 1  # Street deals priority
                                 street_deals.append(deal)
 
                     # Add neighborhood deals with lowest priority
@@ -545,9 +626,9 @@ class GovmapClient:
                         deal_id = f"{deal.get('dealId', '')}{deal.get('address', '')}{deal.get('dealDate', '')}"
                         if deal_id not in seen_deals:
                             seen_deals.add(deal_id)
-                            deal['source_polygon_id'] = polygon_id
-                            deal['deal_source'] = 'neighborhood'
-                            deal['priority'] = 2  # Lowest priority
+                            deal["source_polygon_id"] = polygon_id
+                            deal["deal_source"] = "neighborhood"
+                            deal["priority"] = 2  # Lowest priority
                             neighborhood_deals.append(deal)
 
                 except Exception as e:
@@ -559,8 +640,12 @@ class GovmapClient:
 
             # Use stable sort: first by date (newest first), then by priority
             # Since Python's sort is stable, the second sort maintains date order within each priority
-            all_deals.sort(key=lambda x: x.get('dealDate', '1900-01-01'), reverse=True)  # Newest first
-            all_deals.sort(key=lambda x: x.get('priority', 3))  # Priority first (0=building, 1=street, 2=neighborhood)
+            all_deals.sort(
+                key=lambda x: x.get("dealDate", "1900-01-01"), reverse=True
+            )  # Newest first
+            all_deals.sort(
+                key=lambda x: x.get("priority", 3)
+            )  # Priority first (0=building, 1=street, 2=neighborhood)
 
             # Limit to max_deals
             if len(all_deals) > max_deals:
@@ -568,20 +653,28 @@ class GovmapClient:
 
             # Add price per square meter calculation and deal type info
             for deal in all_deals:
-                price = deal.get('dealAmount', 0)
-                area = deal.get('assetArea', 0)
-                if isinstance(price, (int, float)) and isinstance(area, (int, float)) and area > 0:
-                    deal['price_per_sqm'] = round(price / area, 2)
+                price = deal.get("dealAmount", 0)
+                area = deal.get("assetArea", 0)
+                if (
+                    isinstance(price, (int, float))
+                    and isinstance(area, (int, float))
+                    and area > 0
+                ):
+                    deal["price_per_sqm"] = round(price / area, 2)
                 else:
-                    deal['price_per_sqm'] = None
-                
-                # Add deal type description for clarity
-                deal['deal_type'] = deal_type
-                deal['deal_type_description'] = 'first_hand_new' if deal_type == 1 else 'second_hand_used'
+                    deal["price_per_sqm"] = None
 
-            logger.info(f"Found {len(all_deals)} total deals for address: {address} "
-                       f"(Building: {len(building_deals)}, Street: {len(street_deals)}, Neighborhood: {len(neighborhood_deals)}) "
-                       f"[{deal['deal_type_description'] if all_deals else 'N/A'}]")
+                # Add deal type description for clarity
+                deal["deal_type"] = deal_type
+                deal["deal_type_description"] = (
+                    "first_hand_new" if deal_type == 1 else "second_hand_used"
+                )
+
+            logger.info(
+                f"Found {len(all_deals)} total deals for address: {address} "
+                f"(Building: {len(building_deals)}, Street: {len(street_deals)}, Neighborhood: {len(neighborhood_deals)}) "
+                f"[{deal['deal_type_description'] if all_deals else 'N/A'}]"
+            )
             return all_deals
 
         except Exception as e:
@@ -591,28 +684,33 @@ class GovmapClient:
     def _is_same_building(self, search_address: str, deal_address: str) -> bool:
         """
         Check if a deal is from the same building as the search address.
-        
+
         Args:
             search_address: The normalized search address (lowercase, stripped)
             deal_address: The normalized deal address (lowercase, stripped)
-            
+
         Returns:
             True if likely the same building, False otherwise
         """
         if not search_address or not deal_address:
             return False
-            
+
         # Exact match
         if search_address == deal_address:
             return True
-            
+
         # Extract key components for comparison
         def extract_address_parts(addr: str) -> tuple:
             """Extract street name and number from address"""
             # Remove common prefixes/suffixes and normalize
-            addr_clean = addr.replace('רח\'', '').replace('רחוב', '').replace('שד\'', '').replace('שדרות', '')
-            addr_clean = addr_clean.replace('  ', ' ').strip()
-            
+            addr_clean = (
+                addr.replace("רח'", "")
+                .replace("רחוב", "")
+                .replace("שד'", "")
+                .replace("שדרות", "")
+            )
+            addr_clean = addr_clean.replace("  ", " ").strip()
+
             # Try to extract number and street name
             parts = addr_clean.split()
             if len(parts) >= 2:
@@ -620,27 +718,33 @@ class GovmapClient:
                 for i, part in enumerate(parts):
                     if part.isdigit() or any(c.isdigit() for c in part):
                         number = part
-                        street_parts = parts[:i] + parts[i+1:]
-                        street_name = ' '.join(street_parts).strip()
+                        street_parts = parts[:i] + parts[i + 1 :]
+                        street_name = " ".join(street_parts).strip()
                         return (street_name, number)
-            
-            return (addr_clean, '')
-        
+
+            return (addr_clean, "")
+
         search_street, search_number = extract_address_parts(search_address)
         deal_street, deal_number = extract_address_parts(deal_address)
-        
+
         # Same street and same number = same building
-        if (search_street and deal_street and search_number and deal_number and
-            search_street == deal_street and search_number == deal_number):
+        if (
+            search_street
+            and deal_street
+            and search_number
+            and deal_number
+            and search_street == deal_street
+            and search_number == deal_number
+        ):
             return True
-            
+
         # Check if one address is contained in the other (for different formats of same address)
         if len(search_address) > 5 and len(deal_address) > 5:
             if search_address in deal_address or deal_address in search_address:
                 return True
-                
+
         return False
-    
+
     def filter_deals_by_criteria(
         self,
         deals: List[Dict[str, Any]],
@@ -656,7 +760,7 @@ class GovmapClient:
     ) -> List[Dict[str, Any]]:
         """
         Filter deals by various criteria.
-        
+
         Args:
             deals: List of deal dictionaries to filter
             property_type: Property type to filter by (Hebrew description)
@@ -668,16 +772,16 @@ class GovmapClient:
             max_area: Maximum asset area (square meters)
             min_floor: Minimum floor number
             max_floor: Maximum floor number
-            
+
         Returns:
             Filtered list of deals
-            
+
         Raises:
             ValueError: If filter criteria are invalid
         """
         if not isinstance(deals, list):
             raise ValueError("deals must be a list")
-        
+
         # Validate numeric ranges
         if min_rooms is not None and max_rooms is not None and min_rooms > max_rooms:
             raise ValueError("min_rooms cannot be greater than max_rooms")
@@ -687,18 +791,20 @@ class GovmapClient:
             raise ValueError("min_area cannot be greater than max_area")
         if min_floor is not None and max_floor is not None and min_floor > max_floor:
             raise ValueError("min_floor cannot be greater than max_floor")
-        
+
         filtered_deals = []
-        
+
         for deal in deals:
             # Property type filter
             if property_type is not None:
-                deal_type = deal.get('propertyTypeDescription', deal.get('assetTypeHeb', ''))
+                deal_type = deal.get(
+                    "propertyTypeDescription", deal.get("assetTypeHeb", "")
+                )
                 if property_type.lower() not in deal_type.lower():
                     continue
-            
+
             # Room count filter
-            rooms = deal.get('assetRoomNum')
+            rooms = deal.get("assetRoomNum")
             if rooms is not None:
                 try:
                     rooms = float(rooms)
@@ -708,9 +814,9 @@ class GovmapClient:
                         continue
                 except (TypeError, ValueError):
                     pass  # Skip deals with invalid room data
-            
+
             # Price filter
-            price = deal.get('dealAmount')
+            price = deal.get("dealAmount")
             if price is not None:
                 try:
                     price = float(price)
@@ -720,9 +826,9 @@ class GovmapClient:
                         continue
                 except (TypeError, ValueError):
                     pass  # Skip deals with invalid price data
-            
+
             # Area filter
-            area = deal.get('assetArea')
+            area = deal.get("assetArea")
             if area is not None:
                 try:
                     area = float(area)
@@ -732,9 +838,9 @@ class GovmapClient:
                         continue
                 except (TypeError, ValueError):
                     pass  # Skip deals with invalid area data
-            
+
             # Floor filter
-            floor_str = deal.get('floorNo', '')
+            floor_str = deal.get("floorNo", "")
             if floor_str and isinstance(floor_str, str):
                 # Try to extract floor number (handles Hebrew floor descriptions)
                 floor_num = self._extract_floor_number(floor_str)
@@ -743,106 +849,110 @@ class GovmapClient:
                         continue
                     if max_floor is not None and floor_num > max_floor:
                         continue
-            
+
             filtered_deals.append(deal)
-        
+
         return filtered_deals
-    
+
     def _extract_floor_number(self, floor_str: str) -> Optional[int]:
         """
         Extract numeric floor number from Hebrew floor description.
-        
+
         Args:
             floor_str: Floor description string (e.g., "שלישית", "קומה 3", "3")
-            
+
         Returns:
             Floor number or None if cannot be extracted
         """
         if not floor_str:
             return None
-        
+
         # Hebrew ordinal floor names to numbers
         hebrew_floors = {
-            'קרקע': 0, 'מרתף': -1,
-            'ראשונה': 1, 'שניה': 2, 'שלישית': 3, 'רביעית': 4,
-            'חמישית': 5, 'שישית': 6, 'שביעית': 7, 'שמינית': 8,
-            'תשיעית': 9, 'עשירית': 10
+            "קרקע": 0,
+            "מרתף": -1,
+            "ראשונה": 1,
+            "שניה": 2,
+            "שלישית": 3,
+            "רביעית": 4,
+            "חמישית": 5,
+            "שישית": 6,
+            "שביעית": 7,
+            "שמינית": 8,
+            "תשיעית": 9,
+            "עשירית": 10,
         }
-        
+
         floor_lower = floor_str.lower().strip()
-        
+
         # Check for direct match with Hebrew names
         for heb, num in hebrew_floors.items():
             if heb in floor_lower:
                 return num
-        
+
         # Try to extract number from string
-        import re
-        numbers = re.findall(r'\d+', floor_str)
+        numbers = re.findall(r"\d+", floor_str)
         if numbers:
             try:
                 return int(numbers[0])
             except ValueError:
                 pass
-        
+
         return None
-    
-    def calculate_deal_statistics(
-        self,
-        deals: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+
+    def calculate_deal_statistics(self, deals: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Calculate statistical aggregations on deal data.
-        
+
         Args:
             deals: List of deal dictionaries
-            
+
         Returns:
             Dictionary with statistical metrics
-            
+
         Raises:
             ValueError: If deals is not a valid list
         """
         if not isinstance(deals, list):
             raise ValueError("deals must be a list")
-        
+
         if not deals:
             return {
                 "count": 0,
                 "price_stats": {},
                 "area_stats": {},
                 "price_per_sqm_stats": {},
-                "room_distribution": {}
+                "room_distribution": {},
             }
-        
+
         # Extract numeric values
         prices = []
         areas = []
         price_per_sqm_values = []
         rooms = []
-        
+
         for deal in deals:
-            price = deal.get('dealAmount')
+            price = deal.get("dealAmount")
             if isinstance(price, (int, float)) and price > 0:
                 prices.append(price)
-            
-            area = deal.get('assetArea')
+
+            area = deal.get("assetArea")
             if isinstance(area, (int, float)) and area > 0:
                 areas.append(area)
-            
-            pps = deal.get('price_per_sqm')
+
+            pps = deal.get("price_per_sqm")
             if pps is None and price and area and area > 0:
                 pps = price / area
             if isinstance(pps, (int, float)) and pps > 0:
                 price_per_sqm_values.append(pps)
-            
-            room_count = deal.get('assetRoomNum')
+
+            room_count = deal.get("assetRoomNum")
             if isinstance(room_count, (int, float)):
                 rooms.append(room_count)
-        
+
         # Calculate statistics
         stats: Dict[str, Any] = {"count": len(deals)}
-        
+
         # Price statistics
         if prices:
             sorted_prices = sorted(prices)
@@ -853,10 +963,12 @@ class GovmapClient:
                 "max": max(prices),
                 "p25": sorted_prices[len(sorted_prices) // 4],
                 "p75": sorted_prices[(3 * len(sorted_prices)) // 4],
-                "std_dev": round(self._calculate_std_dev(prices), 2) if len(prices) > 1 else 0,
-                "total": sum(prices)
+                "std_dev": round(self._calculate_std_dev(prices), 2)
+                if len(prices) > 1
+                else 0,
+                "total": sum(prices),
             }
-        
+
         # Area statistics
         if areas:
             sorted_areas = sorted(areas)
@@ -866,9 +978,9 @@ class GovmapClient:
                 "min": min(areas),
                 "max": max(areas),
                 "p25": sorted_areas[len(sorted_areas) // 4],
-                "p75": sorted_areas[(3 * len(sorted_areas)) // 4]
+                "p75": sorted_areas[(3 * len(sorted_areas)) // 4],
             }
-        
+
         # Price per sqm statistics
         if price_per_sqm_values:
             sorted_pps = sorted(price_per_sqm_values)
@@ -878,21 +990,20 @@ class GovmapClient:
                 "min": round(min(price_per_sqm_values), 2),
                 "max": round(max(price_per_sqm_values), 2),
                 "p25": round(sorted_pps[len(sorted_pps) // 4], 2),
-                "p75": round(sorted_pps[(3 * len(sorted_pps)) // 4], 2)
+                "p75": round(sorted_pps[(3 * len(sorted_pps)) // 4], 2),
             }
-        
+
         # Room distribution
         if rooms:
-            from collections import Counter
             room_counts = Counter(rooms)
             stats["room_distribution"] = dict(sorted(room_counts.items()))
-        
+
         return stats
-    
+
     def _calculate_std_dev(self, values: List[float]) -> float:
         """Calculate standard deviation of a list of values."""
         if len(values) < 2:
             return 0.0
         mean = sum(values) / len(values)
         variance = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
-        return variance ** 0.5
+        return variance**0.5
