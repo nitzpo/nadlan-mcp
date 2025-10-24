@@ -678,6 +678,27 @@ def get_deal_statistics(
         logger.error(f"Error in get_deal_statistics: {e}")
         return f"Error calculating deal statistics: {str(e)}"
 
+
+def _safe_calculate_metric(metric_func, deals):
+    """
+    Safely execute a metric calculation function.
+
+    Helper function to reduce code duplication in try-except blocks
+    for market metric calculations.
+
+    Args:
+        metric_func: Function to call with deals as argument
+        deals: List of deal dictionaries to analyze
+
+    Returns:
+        Result dictionary from metric_func, or error dictionary if ValueError raised
+    """
+    try:
+        return metric_func(deals)
+    except ValueError as e:
+        return {"error": str(e)}
+
+
 @mcp.tool()
 def get_market_activity_metrics(
     address: str,
@@ -714,23 +735,10 @@ def get_market_activity_metrics(
                 "radius_meters": radius_meters
             }, ensure_ascii=False, indent=2)
 
-        # Calculate market activity score
-        try:
-            activity_metrics = client.calculate_market_activity_score(deals)
-        except ValueError as e:
-            activity_metrics = {"error": str(e)}
-
-        # Calculate market liquidity
-        try:
-            liquidity_metrics = client.get_market_liquidity(deals)
-        except ValueError as e:
-            liquidity_metrics = {"error": str(e)}
-
-        # Analyze investment potential
-        try:
-            investment_metrics = client.analyze_investment_potential(deals)
-        except ValueError as e:
-            investment_metrics = {"error": str(e)}
+        # Calculate market metrics using helper to reduce duplication
+        activity_metrics = _safe_calculate_metric(client.calculate_market_activity_score, deals)
+        liquidity_metrics = _safe_calculate_metric(client.get_market_liquidity, deals)
+        investment_metrics = _safe_calculate_metric(client.analyze_investment_potential, deals)
 
         # Combine all metrics
         return json.dumps({
@@ -742,11 +750,11 @@ def get_market_activity_metrics(
             "market_liquidity": liquidity_metrics,
             "investment_potential": investment_metrics,
             "summary": {
-                "activity_level": activity_metrics.get("activity_level", "unknown"),
-                "liquidity_rating": liquidity_metrics.get("liquidity_rating", "unknown"),
-                "investment_score": investment_metrics.get("investment_score", 0),
-                "price_trend": investment_metrics.get("price_trend", "unknown"),
-                "market_stability": investment_metrics.get("market_stability", "unknown")
+                "activity_level": activity_metrics.get("activity_level"),
+                "liquidity_rating": liquidity_metrics.get("liquidity_rating"),
+                "investment_score": investment_metrics.get("investment_score"),
+                "price_trend": investment_metrics.get("price_trend"),
+                "market_stability": investment_metrics.get("market_stability")
             }
         }, ensure_ascii=False, indent=2)
 
@@ -756,4 +764,4 @@ def get_market_activity_metrics(
 
 # Run the server
 if __name__ == "__main__":
-    mcp.run() 
+    mcp.run()
