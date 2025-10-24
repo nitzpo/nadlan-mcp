@@ -622,14 +622,18 @@ class GovmapClient:
 
                     # Process street deals and separate building deals
                     for deal in current_street_deals:
-                        deal_id = f"{deal.get('dealId', '')}{deal.get('address', '')}{deal.get('dealDate', '')}"
+                        # Create unique deal ID for deduplication
+                        deal_id = f"{deal.get('dealId', '')}{deal.get('dealDate', '')}"
                         if deal_id not in seen_deals:
                             seen_deals.add(deal_id)
                             deal["source_polygon_id"] = polygon_id
                             deal["deal_source"] = "street"
 
                             # Check if this is from the same building
-                            deal_address = deal.get("address", "").lower().strip()
+                            # Construct address from API fields (API doesn't have single "address" field)
+                            street = deal.get("streetNameHeb", "")
+                            house_num = str(deal.get("houseNum", ""))
+                            deal_address = f"{street} {house_num}".lower().strip()
                             if self._is_same_building(
                                 search_address_normalized, deal_address
                             ):
@@ -642,7 +646,8 @@ class GovmapClient:
 
                     # Add neighborhood deals with lowest priority
                     for deal in current_neighborhood_deals:
-                        deal_id = f"{deal.get('dealId', '')}{deal.get('address', '')}{deal.get('dealDate', '')}"
+                        # Create unique deal ID for deduplication
+                        deal_id = f"{deal.get('dealId', '')}{deal.get('dealDate', '')}"
                         if deal_id not in seen_deals:
                             seen_deals.add(deal_id)
                             deal["source_polygon_id"] = polygon_id
@@ -699,6 +704,24 @@ class GovmapClient:
         except Exception as e:
             logger.error(f"Error in find_recent_deals_for_address: {e}")
             raise
+
+    def _calculate_distance(self, point1: Tuple[float, float], point2: Tuple[float, float]) -> float:
+        """
+        Calculate Euclidean distance between two points in ITM coordinates.
+
+        ITM (Israeli Transverse Mercator) uses meters as units, so Euclidean
+        distance provides accurate results for distances within Israel.
+
+        Args:
+            point1: (longitude, latitude) in ITM
+            point2: (longitude, latitude) in ITM
+
+        Returns:
+            Distance in meters
+        """
+        dx = point2[0] - point1[0]
+        dy = point2[1] - point1[1]
+        return (dx * dx + dy * dy) ** 0.5
 
     def _is_same_building(self, search_address: str, deal_address: str) -> bool:
         """
@@ -819,7 +842,13 @@ class GovmapClient:
                 deal_type = deal.get(
                     "propertyTypeDescription", deal.get("assetTypeHeb", "")
                 )
-                if property_type.lower() not in deal_type.lower():
+                # Normalize both strings for flexible matching
+                property_type_normalized = property_type.lower().strip()
+                deal_type_normalized = deal_type.lower().strip()
+
+                # Check if the filter term appears in the deal type
+                # This allows "דירה" to match "דירת גג", "דירה בבניין", etc.
+                if property_type_normalized not in deal_type_normalized:
                     continue
 
             # Room count filter

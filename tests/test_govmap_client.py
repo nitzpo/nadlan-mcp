@@ -525,3 +525,22 @@ class TestMarketAnalysisFunctions:
         assert stats["count"] == 3
         assert stats["price_stats"]["mean"] > 0
         assert stats["area_stats"]["mean"] == pytest.approx(80.0)
+
+    def test_same_building_detection_with_api_fields(self):
+        """Test same building detection with actual API field structure."""
+        client = GovmapClient()
+
+        # Test that _is_same_building works with addresses constructed from API fields
+        search_address = "חנקין 62"
+
+        # Deal from same building (should match)
+        deal_address_same = "חנקין 62"
+        assert client._is_same_building(search_address, deal_address_same) is True
+
+        # Deal from different building on same street (should not match)
+        deal_address_different = "חנקין 50"
+        assert client._is_same_building(search_address, deal_address_different) is False
+
+        # Deal from different street (should not match)
+        deal_address_other_street = "בילינסון 6"
+        assert client._is_same_building(search_address, deal_address_other_street) is False
