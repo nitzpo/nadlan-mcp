@@ -6,6 +6,7 @@ import pytest
 import requests
 from unittest.mock import Mock, patch
 from nadlan_mcp.govmap import GovmapClient
+from nadlan_mcp.config import GovmapConfig
 
 
 class TestGovmapClient:
@@ -22,7 +23,8 @@ class TestGovmapClient:
     def test_client_initialization_with_custom_url(self):
         """Test that GovmapClient can be initialized with custom URL."""
         custom_url = "https://custom-api.example.com/api/"
-        client = GovmapClient(custom_url)
+        custom_config = GovmapConfig(base_url=custom_url)
+        client = GovmapClient(custom_config)
         assert client.base_url == "https://custom-api.example.com/api"
     
     @patch('requests.Session')
@@ -226,26 +228,31 @@ class TestGovmapClient:
                 "dealId": "deal1",
                 "dealAmount": 1000000,
                 "dealDate": "2025-01-01T00:00:00.000Z",
-                "address": "Test Street 1"
+                "address": "Test Street 1",
+                "priority": 1
             }
         ]
-        
+
         # Mock neighborhood deals response
         mock_neighborhood.return_value = [
             {
                 "dealId": "deal2",
                 "dealAmount": 2000000,
                 "dealDate": "2025-01-15T00:00:00.000Z",
-                "address": "Test Street 2"
+                "address": "Test Street 2",
+                "priority": 2
             }
         ]
         
         client = GovmapClient()
         result = client.find_recent_deals_for_address("test address", years_back=1)
-        
+
         assert len(result) == 2
-        assert result[0]["dealDate"] == "2025-01-15T00:00:00.000Z"  # Should be sorted by date
-        assert result[1]["dealDate"] == "2025-01-01T00:00:00.000Z"
+        # Should be sorted by priority first (street=1 before neighborhood=2), then by date
+        assert result[0]["priority"] == 1  # Street deal comes first
+        assert result[0]["dealDate"] == "2025-01-01T00:00:00.000Z"
+        assert result[1]["priority"] == 2  # Neighborhood deal comes second
+        assert result[1]["dealDate"] == "2025-01-15T00:00:00.000Z"
     
     @patch('requests.Session')
     def test_http_error_handling(self, mock_session_class):
