@@ -37,7 +37,7 @@ def strip_bloat_fields(deals: List[Dict]) -> List[Dict]:
     Returns:
         List of deals with bloat fields removed
     """
-    bloat_fields = ['shape', 'sourceorder', 'source_polygon_id']
+    bloat_fields = {'shape', 'sourceorder', 'source_polygon_id'}
 
     return [
         {k: v for k, v in deal.items() if k not in bloat_fields}
