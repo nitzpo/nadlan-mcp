@@ -510,7 +510,7 @@ class GovmapClient:
         address: str,
         years_back: int = 2,
         radius: int = 30,
-        max_deals: int = 50,
+        max_deals: int = 100,
         deal_type: int = 2,
     ) -> List[Dict[str, Any]]:
         """
@@ -524,7 +524,7 @@ class GovmapClient:
             years_back: How many years back to search (default: 2)
             radius: Search radius in meters for initial coordinate search (default: 30)
                    Small radius since street deals cover the entire street anyway
-            max_deals: Maximum number of deals to return (default: 50)
+            max_deals: Maximum number of deals to return (default: 100)
             deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
 
         Returns:
@@ -622,14 +622,18 @@ class GovmapClient:
 
                     # Process street deals and separate building deals
                     for deal in current_street_deals:
-                        deal_id = f"{deal.get('dealId', '')}{deal.get('address', '')}{deal.get('dealDate', '')}"
+                        # Create unique deal ID for deduplication
+                        deal_id = f"{deal.get('dealId', '')}{deal.get('dealDate', '')}"
                         if deal_id not in seen_deals:
                             seen_deals.add(deal_id)
                             deal["source_polygon_id"] = polygon_id
                             deal["deal_source"] = "street"
 
                             # Check if this is from the same building
-                            deal_address = deal.get("address", "").lower().strip()
+                            # Construct address from API fields (API doesn't have single "address" field)
+                            street = deal.get("streetNameHeb", "")
+                            house_num = str(deal.get("houseNum", ""))
+                            deal_address = f"{street} {house_num}".lower().strip()
                             if self._is_same_building(
                                 search_address_normalized, deal_address
                             ):
@@ -642,7 +646,8 @@ class GovmapClient:
 
                     # Add neighborhood deals with lowest priority
                     for deal in current_neighborhood_deals:
-                        deal_id = f"{deal.get('dealId', '')}{deal.get('address', '')}{deal.get('dealDate', '')}"
+                        # Create unique deal ID for deduplication
+                        deal_id = f"{deal.get('dealId', '')}{deal.get('dealDate', '')}"
                         if deal_id not in seen_deals:
                             seen_deals.add(deal_id)
                             deal["source_polygon_id"] = polygon_id
@@ -699,6 +704,24 @@ class GovmapClient:
         except Exception as e:
             logger.error(f"Error in find_recent_deals_for_address: {e}")
             raise
+
+    def _calculate_distance(self, point1: Tuple[float, float], point2: Tuple[float, float]) -> float:
+        """
+        Calculate Euclidean distance between two points in ITM coordinates.
+
+        ITM (Israeli Transverse Mercator) uses meters as units, so Euclidean
+        distance provides accurate results for distances within Israel.
+
+        Args:
+            point1: (longitude, latitude) in ITM
+            point2: (longitude, latitude) in ITM
+
+        Returns:
+            Distance in meters
+        """
+        dx = point2[0] - point1[0]
+        dy = point2[1] - point1[1]
+        return (dx * dx + dy * dy) ** 0.5
 
     def _is_same_building(self, search_address: str, deal_address: str) -> bool:
         """
@@ -819,12 +842,24 @@ class GovmapClient:
                 deal_type = deal.get(
                     "propertyTypeDescription", deal.get("assetTypeHeb", "")
                 )
-                if property_type.lower() not in deal_type.lower():
+                # Skip deals with missing property type data when filter is active
+                if not deal_type:
+                    continue
+
+                # Normalize both strings for flexible matching
+                property_type_normalized = property_type.lower().strip()
+                deal_type_normalized = deal_type.lower().strip()
+
+                # Check if the filter term appears in the deal type
+                # This allows "דירה" to match "דירת גג", "דירה בבניין", etc.
+                if property_type_normalized not in deal_type_normalized:
                     continue
 
             # Room count filter
-            rooms = deal.get("assetRoomNum")
-            if rooms is not None:
+            if min_rooms is not None or max_rooms is not None:
+                rooms = deal.get("assetRoomNum")
+                if rooms is None:
+                    continue  # Skip deals with missing room data when filter is active
                 try:
                     rooms = float(rooms)
                     if min_rooms is not None and rooms < min_rooms:
@@ -832,11 +867,13 @@ class GovmapClient:
                     if max_rooms is not None and rooms > max_rooms:
                         continue
                 except (TypeError, ValueError):
-                    pass  # Skip deals with invalid room data
+                    continue  # Skip deals with invalid room data when filter is active
 
             # Price filter
-            price = deal.get("dealAmount")
-            if price is not None:
+            if min_price is not None or max_price is not None:
+                price = deal.get("dealAmount")
+                if price is None:
+                    continue  # Skip deals with missing price data when filter is active
                 try:
                     price = float(price)
                     if min_price is not None and price < min_price:
@@ -844,11 +881,13 @@ class GovmapClient:
                     if max_price is not None and price > max_price:
                         continue
                 except (TypeError, ValueError):
-                    pass  # Skip deals with invalid price data
+                    continue  # Skip deals with invalid price data when filter is active
 
             # Area filter
-            area = deal.get("assetArea")
-            if area is not None:
+            if min_area is not None or max_area is not None:
+                area = deal.get("assetArea")
+                if area is None:
+                    continue  # Skip deals with missing area data when filter is active
                 try:
                     area = float(area)
                     if min_area is not None and area < min_area:
@@ -856,7 +895,7 @@ class GovmapClient:
                     if max_area is not None and area > max_area:
                         continue
                 except (TypeError, ValueError):
-                    pass  # Skip deals with invalid area data
+                    continue  # Skip deals with invalid area data when filter is active
 
             # Floor filter
             floor_str = deal.get("floorNo", "")

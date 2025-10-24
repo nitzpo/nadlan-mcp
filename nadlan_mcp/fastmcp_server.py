@@ -22,6 +22,28 @@ mcp = FastMCP("nadlan-mcp")
 # Initialize the Govmap client
 client = GovmapClient()
 
+def strip_bloat_fields(deals: List[Dict]) -> List[Dict]:
+    """
+    Remove bloat fields from deal objects to reduce token usage in MCP responses.
+
+    Removes:
+    - shape: Large MULTIPOLYGON coordinate data (~40-50% of tokens, not useful for LLM analysis)
+    - sourceorder: Internal ordering field
+    - source_polygon_id: Internal reference field
+
+    Args:
+        deals: List of deal dictionaries
+
+    Returns:
+        List of deals with bloat fields removed
+    """
+    bloat_fields = {'shape', 'sourceorder', 'source_polygon_id'}
+
+    return [
+        {k: v for k, v in deal.items() if k not in bloat_fields}
+        for deal in deals
+    ]
+
 @mcp.tool()
 def autocomplete_address(search_text: str) -> str:
     """Search and autocomplete Israeli addresses.
@@ -77,7 +99,7 @@ def get_deals_by_radius(latitude: float, longitude: float, radius_meters: int = 
             "total_deals": len(deals),
             "search_radius_meters": radius_meters,
             "center_coordinates": {"latitude": latitude, "longitude": longitude},
-            "deals": deals
+            "deals": strip_bloat_fields(deals)
         }, ensure_ascii=False, indent=2)
         
     except Exception as e:
@@ -134,15 +156,15 @@ def get_street_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> s
             "deal_type": deal_type,
             "deal_type_description": deal_type_desc,
             "market_statistics": stats,
-            "deals": deals
+            "deals": strip_bloat_fields(deals)
         }, ensure_ascii=False, indent=2)
-        
+
     except Exception as e:
         logger.error(f"Error in get_street_deals: {e}")
         return f"Error fetching street deals: {str(e)}"
 
 @mcp.tool()
-def find_recent_deals_for_address(address: str, years_back: int = 2, radius_meters: int = 30, max_deals: int = 50, deal_type: int = 2) -> str:
+def find_recent_deals_for_address(address: str, years_back: int = 2, radius_meters: int = 30, max_deals: int = 100, deal_type: int = 2) -> str:
     """Find recent real estate deals for a specific address.
     
     Args:
@@ -150,7 +172,7 @@ def find_recent_deals_for_address(address: str, years_back: int = 2, radius_mete
         years_back: How many years back to search (default: 2)
         radius_meters: Search radius in meters from the address (default: 30)
                       Small radius since street deals cover the entire street anyway
-        max_deals: Maximum number of deals to return (default: 50, optimized for LLM token limits)
+        max_deals: Maximum number of deals to return (default: 100, provides good context for LLM analysis)
         deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
         
     Returns:
@@ -221,7 +243,7 @@ def find_recent_deals_for_address(address: str, years_back: int = 2, radius_mete
                 "deal_type_description": deal_type_desc
             },
             "market_statistics": stats,
-            "deals": deals
+            "deals": strip_bloat_fields(deals)
         }, ensure_ascii=False, indent=2)
         
     except Exception as e:
@@ -278,9 +300,9 @@ def get_neighborhood_deals(polygon_id: str, limit: int = 100, deal_type: int = 2
             "deal_type": deal_type,
             "deal_type_description": deal_type_desc,
             "market_statistics": stats,
-            "deals": deals
+            "deals": strip_bloat_fields(deals)
         }, ensure_ascii=False, indent=2)
-        
+
     except Exception as e:
         logger.error(f"Error in get_neighborhood_deals: {e}")
         return f"Error fetching neighborhood deals: {str(e)}"
@@ -544,13 +566,16 @@ def get_valuation_comparables(
     min_area: Optional[float] = None,
     max_area: Optional[float] = None,
     min_floor: Optional[int] = None,
-    max_floor: Optional[int] = None
+    max_floor: Optional[int] = None,
+    radius_meters: int = 100,
+    max_comparables: int = 50
 ) -> str:
     """Get comparable properties for valuation analysis.
-    
+
     This tool provides detailed comparable deals filtered by your criteria.
-    The LLM can then analyze these comparables and estimate property values.
-    
+    Returns a generous number of comparables by default - the LLM analyzing
+    the results can determine which are most similar based on the full details.
+
     Args:
         address: The address to find comparables for (in Hebrew or English)
         years_back: How many years back to search (default: 2)
@@ -563,13 +588,21 @@ def get_valuation_comparables(
         max_area: Maximum asset area (square meters)
         min_floor: Minimum floor number
         max_floor: Maximum floor number
-        
+        radius_meters: Search radius in meters (default: 100, larger than find_recent_deals to get more comparables)
+        max_comparables: Maximum number of deals to return (default: 50, optimized for MCP token limits)
+
     Returns:
-        JSON string containing filtered comparable deals with full details
+        JSON string containing filtered comparable deals with full details.
+        Returns many comparables so LLM can assess similarity and relevance.
     """
     try:
-        # Get all deals for the address
-        deals = client.find_recent_deals_for_address(address, years_back)
+        # Get all deals for the address with higher limits for valuation
+        deals = client.find_recent_deals_for_address(
+            address,
+            years_back,
+            radius=radius_meters,
+            max_deals=max_comparables
+        )
         
         if not deals:
             return json.dumps({
@@ -608,9 +641,9 @@ def get_valuation_comparables(
             },
             "total_comparables": len(filtered_deals),
             "statistics": stats,
-            "comparables": filtered_deals
+            "comparables": strip_bloat_fields(filtered_deals)
         }, ensure_ascii=False, indent=2)
-        
+
     except Exception as e:
         logger.error(f"Error in get_valuation_comparables: {e}")
         return f"Error getting valuation comparables: {str(e)}"

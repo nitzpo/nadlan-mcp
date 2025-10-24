@@ -6,6 +6,7 @@ import pytest
 import requests
 from unittest.mock import Mock, patch
 from nadlan_mcp.govmap import GovmapClient
+from nadlan_mcp.config import GovmapConfig
 
 
 class TestGovmapClient:
@@ -22,7 +23,8 @@ class TestGovmapClient:
     def test_client_initialization_with_custom_url(self):
         """Test that GovmapClient can be initialized with custom URL."""
         custom_url = "https://custom-api.example.com/api/"
-        client = GovmapClient(custom_url)
+        custom_config = GovmapConfig(base_url=custom_url)
+        client = GovmapClient(custom_config)
         assert client.base_url == "https://custom-api.example.com/api"
     
     @patch('requests.Session')
@@ -226,26 +228,31 @@ class TestGovmapClient:
                 "dealId": "deal1",
                 "dealAmount": 1000000,
                 "dealDate": "2025-01-01T00:00:00.000Z",
-                "address": "Test Street 1"
+                "address": "Test Street 1",
+                "priority": 1
             }
         ]
-        
+
         # Mock neighborhood deals response
         mock_neighborhood.return_value = [
             {
                 "dealId": "deal2",
                 "dealAmount": 2000000,
                 "dealDate": "2025-01-15T00:00:00.000Z",
-                "address": "Test Street 2"
+                "address": "Test Street 2",
+                "priority": 2
             }
         ]
         
         client = GovmapClient()
         result = client.find_recent_deals_for_address("test address", years_back=1)
-        
+
         assert len(result) == 2
-        assert result[0]["dealDate"] == "2025-01-15T00:00:00.000Z"  # Should be sorted by date
-        assert result[1]["dealDate"] == "2025-01-01T00:00:00.000Z"
+        # Should be sorted by priority first (street=1 before neighborhood=2), then by date
+        assert result[0]["priority"] == 1  # Street deal comes first
+        assert result[0]["dealDate"] == "2025-01-01T00:00:00.000Z"
+        assert result[1]["priority"] == 2  # Neighborhood deal comes second
+        assert result[1]["dealDate"] == "2025-01-15T00:00:00.000Z"
     
     @patch('requests.Session')
     def test_http_error_handling(self, mock_session_class):
@@ -525,3 +532,121 @@ class TestMarketAnalysisFunctions:
         assert stats["count"] == 3
         assert stats["price_stats"]["mean"] > 0
         assert stats["area_stats"]["mean"] == pytest.approx(80.0)
+
+    def test_is_same_building_comparisons(self):
+        """Test `_is_same_building` correctly compares address strings."""
+        client = GovmapClient()
+
+        # Test that _is_same_building works with addresses constructed from API fields
+        search_address = "חנקין 62"
+
+        # Deal from same building (should match)
+        deal_address_same = "חנקין 62"
+        assert client._is_same_building(search_address, deal_address_same) is True
+
+        # Deal from different building on same street (should not match)
+        deal_address_different = "חנקין 50"
+        assert client._is_same_building(search_address, deal_address_different) is False
+
+        # Deal from different street (should not match)
+        deal_address_other_street = "בילינסון 6"
+        assert client._is_same_building(search_address, deal_address_other_street) is False
+
+    def test_filter_excludes_missing_property_type(self):
+        """Test that deals with missing property type are excluded when filter is active."""
+        client = GovmapClient()
+        deals = [
+            {"dealId": "1", "propertyTypeDescription": "דירה"},
+            {"dealId": "2", "propertyTypeDescription": None},
+            {"dealId": "3", "propertyTypeDescription": "בית"},
+            {"dealId": "4"},  # Missing key entirely
+        ]
+
+        filtered = client.filter_deals_by_criteria(deals, property_type="דירה")
+
+        assert len(filtered) == 1
+        assert filtered[0]["dealId"] == "1"
+
+    def test_filter_excludes_missing_area(self):
+        """Test that deals with missing area are excluded when area filter is active."""
+        client = GovmapClient()
+        deals = [
+            {"dealId": "1", "assetArea": 65},
+            {"dealId": "2", "assetArea": None},
+            {"dealId": "3", "assetArea": 50},
+            {"dealId": "4"},  # Missing key entirely
+        ]
+
+        filtered = client.filter_deals_by_criteria(deals, min_area=60, max_area=70)
+
+        assert len(filtered) == 1
+        assert filtered[0]["dealId"] == "1"
+
+    def test_filter_excludes_missing_rooms(self):
+        """Test that deals with missing room count are excluded when room filter is active."""
+        client = GovmapClient()
+        deals = [
+            {"dealId": "1", "assetRoomNum": 3},
+            {"dealId": "2", "assetRoomNum": None},
+            {"dealId": "3", "assetRoomNum": 2},
+            {"dealId": "4"},  # Missing key entirely
+        ]
+
+        filtered = client.filter_deals_by_criteria(deals, min_rooms=2.5, max_rooms=4)
+
+        assert len(filtered) == 1
+        assert filtered[0]["dealId"] == "1"
+
+    def test_filter_excludes_missing_price(self):
+        """Test that deals with missing price are excluded when price filter is active."""
+        client = GovmapClient()
+        deals = [
+            {"dealId": "1", "dealAmount": 2000000},
+            {"dealId": "2", "dealAmount": None},
+            {"dealId": "3", "dealAmount": 1500000},
+            {"dealId": "4"},  # Missing key entirely
+        ]
+
+        filtered = client.filter_deals_by_criteria(deals, min_price=1800000, max_price=2200000)
+
+        assert len(filtered) == 1
+        assert filtered[0]["dealId"] == "1"
+
+    def test_filter_excludes_invalid_numeric_data(self):
+        """Test that deals with invalid numeric data are excluded when filter is active."""
+        client = GovmapClient()
+        deals = [
+            {"dealId": "1", "assetArea": 65, "assetRoomNum": 3, "dealAmount": 2000000},
+            {"dealId": "2", "assetArea": "invalid", "assetRoomNum": 3, "dealAmount": 2000000},
+            {"dealId": "3", "assetArea": 65, "assetRoomNum": "bad", "dealAmount": 2000000},
+            {"dealId": "4", "assetArea": 65, "assetRoomNum": 3, "dealAmount": "wrong"},
+        ]
+
+        # Area filter should exclude deal 2
+        filtered_area = client.filter_deals_by_criteria(deals, min_area=60, max_area=70)
+        assert len(filtered_area) == 3
+        assert all(d["dealId"] in ["1", "3", "4"] for d in filtered_area)
+
+        # Room filter should exclude deal 3
+        filtered_rooms = client.filter_deals_by_criteria(deals, min_rooms=2, max_rooms=4)
+        assert len(filtered_rooms) == 3
+        assert all(d["dealId"] in ["1", "2", "4"] for d in filtered_rooms)
+
+        # Price filter should exclude deal 4
+        filtered_price = client.filter_deals_by_criteria(deals, min_price=1500000, max_price=2500000)
+        assert len(filtered_price) == 3
+        assert all(d["dealId"] in ["1", "2", "3"] for d in filtered_price)
+
+    def test_filter_allows_missing_data_when_no_filter(self):
+        """Test that deals with missing data pass through when no filter is active for that field."""
+        client = GovmapClient()
+        deals = [
+            {"dealId": "1", "propertyTypeDescription": "דירה", "assetArea": 65},
+            {"dealId": "2", "propertyTypeDescription": "דירה", "assetArea": None},
+            {"dealId": "3", "propertyTypeDescription": "דירה"},  # Missing assetArea entirely
+        ]
+
+        # Filter by property type only - missing area should pass through
+        filtered = client.filter_deals_by_criteria(deals, property_type="דירה")
+
+        assert len(filtered) == 3  # All should pass since we're not filtering by area
