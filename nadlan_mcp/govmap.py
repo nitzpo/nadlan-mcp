@@ -842,6 +842,10 @@ class GovmapClient:
                 deal_type = deal.get(
                     "propertyTypeDescription", deal.get("assetTypeHeb", "")
                 )
+                # Skip deals with missing property type data when filter is active
+                if not deal_type:
+                    continue
+
                 # Normalize both strings for flexible matching
                 property_type_normalized = property_type.lower().strip()
                 deal_type_normalized = deal_type.lower().strip()
@@ -852,8 +856,10 @@ class GovmapClient:
                     continue
 
             # Room count filter
-            rooms = deal.get("assetRoomNum")
-            if rooms is not None:
+            if min_rooms is not None or max_rooms is not None:
+                rooms = deal.get("assetRoomNum")
+                if rooms is None:
+                    continue  # Skip deals with missing room data when filter is active
                 try:
                     rooms = float(rooms)
                     if min_rooms is not None and rooms < min_rooms:
@@ -861,11 +867,13 @@ class GovmapClient:
                     if max_rooms is not None and rooms > max_rooms:
                         continue
                 except (TypeError, ValueError):
-                    pass  # Skip deals with invalid room data
+                    continue  # Skip deals with invalid room data when filter is active
 
             # Price filter
-            price = deal.get("dealAmount")
-            if price is not None:
+            if min_price is not None or max_price is not None:
+                price = deal.get("dealAmount")
+                if price is None:
+                    continue  # Skip deals with missing price data when filter is active
                 try:
                     price = float(price)
                     if min_price is not None and price < min_price:
@@ -873,11 +881,13 @@ class GovmapClient:
                     if max_price is not None and price > max_price:
                         continue
                 except (TypeError, ValueError):
-                    pass  # Skip deals with invalid price data
+                    continue  # Skip deals with invalid price data when filter is active
 
             # Area filter
-            area = deal.get("assetArea")
-            if area is not None:
+            if min_area is not None or max_area is not None:
+                area = deal.get("assetArea")
+                if area is None:
+                    continue  # Skip deals with missing area data when filter is active
                 try:
                     area = float(area)
                     if min_area is not None and area < min_area:
@@ -885,7 +895,7 @@ class GovmapClient:
                     if max_area is not None and area > max_area:
                         continue
                 except (TypeError, ValueError):
-                    pass  # Skip deals with invalid area data
+                    continue  # Skip deals with invalid area data when filter is active
 
             # Floor filter
             floor_str = deal.get("floorNo", "")

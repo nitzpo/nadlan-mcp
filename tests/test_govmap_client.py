@@ -551,3 +551,102 @@ class TestMarketAnalysisFunctions:
         # Deal from different street (should not match)
         deal_address_other_street = "בילינסון 6"
         assert client._is_same_building(search_address, deal_address_other_street) is False
+
+    def test_filter_excludes_missing_property_type(self):
+        """Test that deals with missing property type are excluded when filter is active."""
+        client = GovmapClient()
+        deals = [
+            {"dealId": "1", "propertyTypeDescription": "דירה"},
+            {"dealId": "2", "propertyTypeDescription": None},
+            {"dealId": "3", "propertyTypeDescription": "בית"},
+            {"dealId": "4"},  # Missing key entirely
+        ]
+
+        filtered = client.filter_deals_by_criteria(deals, property_type="דירה")
+
+        assert len(filtered) == 1
+        assert filtered[0]["dealId"] == "1"
+
+    def test_filter_excludes_missing_area(self):
+        """Test that deals with missing area are excluded when area filter is active."""
+        client = GovmapClient()
+        deals = [
+            {"dealId": "1", "assetArea": 65},
+            {"dealId": "2", "assetArea": None},
+            {"dealId": "3", "assetArea": 50},
+            {"dealId": "4"},  # Missing key entirely
+        ]
+
+        filtered = client.filter_deals_by_criteria(deals, min_area=60, max_area=70)
+
+        assert len(filtered) == 1
+        assert filtered[0]["dealId"] == "1"
+
+    def test_filter_excludes_missing_rooms(self):
+        """Test that deals with missing room count are excluded when room filter is active."""
+        client = GovmapClient()
+        deals = [
+            {"dealId": "1", "assetRoomNum": 3},
+            {"dealId": "2", "assetRoomNum": None},
+            {"dealId": "3", "assetRoomNum": 2},
+            {"dealId": "4"},  # Missing key entirely
+        ]
+
+        filtered = client.filter_deals_by_criteria(deals, min_rooms=2.5, max_rooms=4)
+
+        assert len(filtered) == 1
+        assert filtered[0]["dealId"] == "1"
+
+    def test_filter_excludes_missing_price(self):
+        """Test that deals with missing price are excluded when price filter is active."""
+        client = GovmapClient()
+        deals = [
+            {"dealId": "1", "dealAmount": 2000000},
+            {"dealId": "2", "dealAmount": None},
+            {"dealId": "3", "dealAmount": 1500000},
+            {"dealId": "4"},  # Missing key entirely
+        ]
+
+        filtered = client.filter_deals_by_criteria(deals, min_price=1800000, max_price=2200000)
+
+        assert len(filtered) == 1
+        assert filtered[0]["dealId"] == "1"
+
+    def test_filter_excludes_invalid_numeric_data(self):
+        """Test that deals with invalid numeric data are excluded when filter is active."""
+        client = GovmapClient()
+        deals = [
+            {"dealId": "1", "assetArea": 65, "assetRoomNum": 3, "dealAmount": 2000000},
+            {"dealId": "2", "assetArea": "invalid", "assetRoomNum": 3, "dealAmount": 2000000},
+            {"dealId": "3", "assetArea": 65, "assetRoomNum": "bad", "dealAmount": 2000000},
+            {"dealId": "4", "assetArea": 65, "assetRoomNum": 3, "dealAmount": "wrong"},
+        ]
+
+        # Area filter should exclude deal 2
+        filtered_area = client.filter_deals_by_criteria(deals, min_area=60, max_area=70)
+        assert len(filtered_area) == 3
+        assert all(d["dealId"] in ["1", "3", "4"] for d in filtered_area)
+
+        # Room filter should exclude deal 3
+        filtered_rooms = client.filter_deals_by_criteria(deals, min_rooms=2, max_rooms=4)
+        assert len(filtered_rooms) == 3
+        assert all(d["dealId"] in ["1", "2", "4"] for d in filtered_rooms)
+
+        # Price filter should exclude deal 4
+        filtered_price = client.filter_deals_by_criteria(deals, min_price=1500000, max_price=2500000)
+        assert len(filtered_price) == 3
+        assert all(d["dealId"] in ["1", "2", "3"] for d in filtered_price)
+
+    def test_filter_allows_missing_data_when_no_filter(self):
+        """Test that deals with missing data pass through when no filter is active for that field."""
+        client = GovmapClient()
+        deals = [
+            {"dealId": "1", "propertyTypeDescription": "דירה", "assetArea": 65},
+            {"dealId": "2", "propertyTypeDescription": "דירה", "assetArea": None},
+            {"dealId": "3", "propertyTypeDescription": "דירה"},  # Missing assetArea entirely
+        ]
+
+        # Filter by property type only - missing area should pass through
+        filtered = client.filter_deals_by_criteria(deals, property_type="דירה")
+
+        assert len(filtered) == 3  # All should pass since we're not filtering by area
