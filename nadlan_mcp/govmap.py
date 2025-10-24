@@ -510,7 +510,7 @@ class GovmapClient:
         address: str,
         years_back: int = 2,
         radius: int = 30,
-        max_deals: int = 50,
+        max_deals: int = 100,
         deal_type: int = 2,
     ) -> List[Dict[str, Any]]:
         """
@@ -524,7 +524,7 @@ class GovmapClient:
             years_back: How many years back to search (default: 2)
             radius: Search radius in meters for initial coordinate search (default: 30)
                    Small radius since street deals cover the entire street anyway
-            max_deals: Maximum number of deals to return (default: 50)
+            max_deals: Maximum number of deals to return (default: 100)
             deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
 
         Returns:
