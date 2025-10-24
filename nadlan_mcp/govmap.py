@@ -11,6 +11,24 @@ from nadlan_mcp.config import GovmapConfig, get_config
 
 logger = logging.getLogger(__name__)
 
+# Market activity score thresholds (deals per month)
+ACTIVITY_VERY_HIGH_THRESHOLD = 10
+ACTIVITY_HIGH_THRESHOLD = 5
+ACTIVITY_MODERATE_THRESHOLD = 3
+ACTIVITY_LOW_THRESHOLD = 1
+
+# Price volatility thresholds (coefficient of variation %)
+VOLATILITY_VERY_VOLATILE_THRESHOLD = 50
+VOLATILITY_VOLATILE_THRESHOLD = 30
+VOLATILITY_MODERATE_THRESHOLD = 20
+VOLATILITY_STABLE_THRESHOLD = 10
+
+# Market liquidity thresholds (deals per month)
+LIQUIDITY_VERY_HIGH_THRESHOLD = 8
+LIQUIDITY_HIGH_THRESHOLD = 5
+LIQUIDITY_MODERATE_THRESHOLD = 2
+LIQUIDITY_LOW_THRESHOLD = 0.5
+
 
 class GovmapClient:
     """
@@ -1066,18 +1084,18 @@ class GovmapClient:
         deals_per_month = total_deals / unique_months if unique_months > 0 else 0
 
         # Calculate activity score (0-100)
-        # Based on deals per month: 0-1 = very low, 1-3 = low, 3-5 = moderate, 5-10 = high, 10+ = very high
-        if deals_per_month >= 10:
+        # Based on deals per month using defined thresholds
+        if deals_per_month >= ACTIVITY_VERY_HIGH_THRESHOLD:
             activity_score = 100
             activity_level = "very_high"
-        elif deals_per_month >= 5:
-            activity_score = 75 + ((deals_per_month - 5) / 5) * 25
+        elif deals_per_month >= ACTIVITY_HIGH_THRESHOLD:
+            activity_score = 75 + ((deals_per_month - ACTIVITY_HIGH_THRESHOLD) / ACTIVITY_HIGH_THRESHOLD) * 25
             activity_level = "high"
-        elif deals_per_month >= 3:
-            activity_score = 50 + ((deals_per_month - 3) / 2) * 25
+        elif deals_per_month >= ACTIVITY_MODERATE_THRESHOLD:
+            activity_score = 50 + ((deals_per_month - ACTIVITY_MODERATE_THRESHOLD) / (ACTIVITY_HIGH_THRESHOLD - ACTIVITY_MODERATE_THRESHOLD)) * 25
             activity_level = "moderate"
-        elif deals_per_month >= 1:
-            activity_score = 25 + ((deals_per_month - 1) / 2) * 25
+        elif deals_per_month >= ACTIVITY_LOW_THRESHOLD:
+            activity_score = 25 + ((deals_per_month - ACTIVITY_LOW_THRESHOLD) / (ACTIVITY_MODERATE_THRESHOLD - ACTIVITY_LOW_THRESHOLD)) * 25
             activity_level = "low"
         else:
             activity_score = deals_per_month * 25
@@ -1206,21 +1224,21 @@ class GovmapClient:
             coefficient_of_variation = 0
 
         # Convert CV to volatility score (0-100, lower is better)
-        # CV < 10% = very stable, 10-20% = stable, 20-30% = moderate, 30-50% = volatile, >50% = very volatile
-        if coefficient_of_variation > 50:
+        # Using defined volatility thresholds
+        if coefficient_of_variation > VOLATILITY_VERY_VOLATILE_THRESHOLD:
             volatility_score = 100
             market_stability = "very_volatile"
-        elif coefficient_of_variation > 30:
-            volatility_score = 75 + ((coefficient_of_variation - 30) / 20) * 25
+        elif coefficient_of_variation > VOLATILITY_VOLATILE_THRESHOLD:
+            volatility_score = 75 + ((coefficient_of_variation - VOLATILITY_VOLATILE_THRESHOLD) / (VOLATILITY_VERY_VOLATILE_THRESHOLD - VOLATILITY_VOLATILE_THRESHOLD)) * 25
             market_stability = "volatile"
-        elif coefficient_of_variation > 20:
-            volatility_score = 50 + ((coefficient_of_variation - 20) / 10) * 25
+        elif coefficient_of_variation > VOLATILITY_MODERATE_THRESHOLD:
+            volatility_score = 50 + ((coefficient_of_variation - VOLATILITY_MODERATE_THRESHOLD) / (VOLATILITY_VOLATILE_THRESHOLD - VOLATILITY_MODERATE_THRESHOLD)) * 25
             market_stability = "moderate"
-        elif coefficient_of_variation > 10:
-            volatility_score = 25 + ((coefficient_of_variation - 10) / 10) * 25
+        elif coefficient_of_variation > VOLATILITY_STABLE_THRESHOLD:
+            volatility_score = 25 + ((coefficient_of_variation - VOLATILITY_STABLE_THRESHOLD) / (VOLATILITY_MODERATE_THRESHOLD - VOLATILITY_STABLE_THRESHOLD)) * 25
             market_stability = "stable"
         else:
-            volatility_score = (coefficient_of_variation / 10) * 25
+            volatility_score = (coefficient_of_variation / VOLATILITY_STABLE_THRESHOLD) * 25
             market_stability = "very_stable"
 
         # Calculate investment score (0-100)
@@ -1322,18 +1340,18 @@ class GovmapClient:
         deals_per_quarter = total_deals / unique_quarters if unique_quarters > 0 else 0
 
         # Calculate velocity score (similar to activity score but focused on turnover)
-        # Based on monthly deal velocity
-        if deals_per_month >= 8:
+        # Based on monthly deal velocity using defined thresholds
+        if deals_per_month >= LIQUIDITY_VERY_HIGH_THRESHOLD:
             velocity_score = 100
             liquidity_rating = "very_high"
-        elif deals_per_month >= 5:
-            velocity_score = 75 + ((deals_per_month - 5) / 3) * 25
+        elif deals_per_month >= LIQUIDITY_HIGH_THRESHOLD:
+            velocity_score = 75 + ((deals_per_month - LIQUIDITY_HIGH_THRESHOLD) / (LIQUIDITY_VERY_HIGH_THRESHOLD - LIQUIDITY_HIGH_THRESHOLD)) * 25
             liquidity_rating = "high"
-        elif deals_per_month >= 2:
-            velocity_score = 50 + ((deals_per_month - 2) / 3) * 25
+        elif deals_per_month >= LIQUIDITY_MODERATE_THRESHOLD:
+            velocity_score = 50 + ((deals_per_month - LIQUIDITY_MODERATE_THRESHOLD) / (LIQUIDITY_HIGH_THRESHOLD - LIQUIDITY_MODERATE_THRESHOLD)) * 25
             liquidity_rating = "moderate"
-        elif deals_per_month >= 0.5:
-            velocity_score = 25 + ((deals_per_month - 0.5) / 1.5) * 25
+        elif deals_per_month >= LIQUIDITY_LOW_THRESHOLD:
+            velocity_score = 25 + ((deals_per_month - LIQUIDITY_LOW_THRESHOLD) / (LIQUIDITY_MODERATE_THRESHOLD - LIQUIDITY_LOW_THRESHOLD)) * 25
             liquidity_rating = "low"
         else:
             velocity_score = deals_per_month * 50
