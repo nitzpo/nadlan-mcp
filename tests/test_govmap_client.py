@@ -533,8 +533,8 @@ class TestMarketAnalysisFunctions:
         assert stats["price_stats"]["mean"] > 0
         assert stats["area_stats"]["mean"] == pytest.approx(80.0)
 
-    def test_same_building_detection_with_api_fields(self):
-        """Test same building detection with actual API field structure."""
+    def test_is_same_building_comparisons(self):
+        """Test `_is_same_building` correctly compares address strings."""
         client = GovmapClient()
 
         # Test that _is_same_building works with addresses constructed from API fields
