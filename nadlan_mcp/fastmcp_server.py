@@ -678,6 +678,90 @@ def get_deal_statistics(
         logger.error(f"Error in get_deal_statistics: {e}")
         return f"Error calculating deal statistics: {str(e)}"
 
+
+def _safe_calculate_metric(metric_func, deals):
+    """
+    Safely execute a metric calculation function.
+
+    Helper function to reduce code duplication in try-except blocks
+    for market metric calculations.
+
+    Args:
+        metric_func: Function to call with deals as argument
+        deals: List of deal dictionaries to analyze
+
+    Returns:
+        Result dictionary from metric_func, or error dictionary if ValueError raised
+    """
+    try:
+        return metric_func(deals)
+    except ValueError as e:
+        return {"error": str(e)}
+
+
+@mcp.tool()
+def get_market_activity_metrics(
+    address: str,
+    years_back: int = 2,
+    radius_meters: int = 100
+) -> str:
+    """Get comprehensive market activity and investment potential analysis.
+
+    This tool provides detailed market liquidity, activity scores, and investment
+    potential metrics. It combines activity scoring, liquidity analysis, and
+    investment potential into a single comprehensive report.
+
+    Args:
+        address: The address to analyze (in Hebrew or English)
+        years_back: How many years back to analyze (default: 2)
+        radius_meters: Search radius in meters (default: 100)
+
+    Returns:
+        JSON string containing:
+            - Market activity score and trends
+            - Market liquidity and velocity metrics
+            - Investment potential analysis
+            - Price appreciation and volatility
+    """
+    try:
+        # Get deals for the address
+        deals = client.find_recent_deals_for_address(address, years_back, radius_meters)
+
+        if not deals:
+            return json.dumps({
+                "address": address,
+                "error": "No deals found for analysis",
+                "years_back": years_back,
+                "radius_meters": radius_meters
+            }, ensure_ascii=False, indent=2)
+
+        # Calculate market metrics using helper to reduce duplication
+        activity_metrics = _safe_calculate_metric(client.calculate_market_activity_score, deals)
+        liquidity_metrics = _safe_calculate_metric(client.get_market_liquidity, deals)
+        investment_metrics = _safe_calculate_metric(client.analyze_investment_potential, deals)
+
+        # Combine all metrics
+        return json.dumps({
+            "address": address,
+            "years_back": years_back,
+            "radius_meters": radius_meters,
+            "total_deals_analyzed": len(deals),
+            "market_activity": activity_metrics,
+            "market_liquidity": liquidity_metrics,
+            "investment_potential": investment_metrics,
+            "summary": {
+                "activity_level": activity_metrics.get("activity_level"),
+                "liquidity_rating": liquidity_metrics.get("liquidity_rating"),
+                "investment_score": investment_metrics.get("investment_score"),
+                "price_trend": investment_metrics.get("price_trend"),
+                "market_stability": investment_metrics.get("market_stability")
+            }
+        }, ensure_ascii=False, indent=2)
+
+    except Exception as e:
+        logger.error(f"Error in get_market_activity_metrics: {e}")
+        return f"Error analyzing market activity: {str(e)}"
+
 # Run the server
 if __name__ == "__main__":
-    mcp.run() 
+    mcp.run()
