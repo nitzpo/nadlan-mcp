@@ -1027,6 +1027,72 @@ class GovmapClient:
         variance = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
         return variance**0.5
 
+    def _parse_deal_dates(
+        self, deals: List[Dict[str, Any]], time_period_months: Optional[int] = None
+    ) -> Tuple[List[str], Dict[str, int], Dict[str, int]]:
+        """
+        Parse and filter deal dates from a list of deals.
+
+        This helper method centralizes the date parsing logic used across
+        multiple market analysis functions. It validates dates, filters by
+        time period if specified, and groups deals by month and quarter.
+
+        Args:
+            deals: List of deal dictionaries with 'dealDate' field
+            time_period_months: Optional time period to filter (from today backwards)
+
+        Returns:
+            Tuple containing:
+                - List of valid deal date strings
+                - Dictionary mapping year-month to deal counts
+                - Dictionary mapping year-quarter to deal counts
+
+        Raises:
+            ValueError: If no valid deal dates are found
+        """
+        from collections import defaultdict
+
+        # Calculate cutoff date if time period is specified
+        cutoff_date = None
+        if time_period_months is not None:
+            cutoff_date = datetime.now() - timedelta(days=time_period_months * 30)
+            cutoff_date_str = cutoff_date.strftime("%Y-%m-%d")
+
+        monthly_deals = defaultdict(int)
+        quarterly_deals = defaultdict(int)
+        deal_dates = []
+
+        for deal in deals:
+            date_str = deal.get("dealDate", "")
+            if not date_str:
+                continue
+
+            try:
+                # Filter by time period if specified
+                if cutoff_date is not None and date_str < cutoff_date_str:
+                    continue
+
+                # Parse date components
+                year = int(date_str[:4])
+                month = int(date_str[5:7])
+                quarter = (month - 1) // 3 + 1  # 1-4
+
+                # Track by month and quarter
+                year_month = f"{year}-{month:02d}"
+                year_quarter = f"{year}-Q{quarter}"
+
+                monthly_deals[year_month] += 1
+                quarterly_deals[year_quarter] += 1
+                deal_dates.append(date_str)
+            except (ValueError, IndexError):
+                logger.warning(f"Invalid date format: {date_str}")
+                continue
+
+        if not deal_dates:
+            raise ValueError("No valid deal dates found in deals list")
+
+        return deal_dates, dict(monthly_deals), dict(quarterly_deals)
+
     def calculate_market_activity_score(
         self, deals: List[Dict[str, Any]], time_period_months: int = 12
     ) -> Dict[str, Any]:
@@ -1055,28 +1121,8 @@ class GovmapClient:
         if not deals:
             raise ValueError("Cannot calculate market activity from empty deals list")
 
-        # Parse deal dates and group by month
-        from collections import defaultdict
-
-        monthly_deals = defaultdict(int)
-        deal_dates = []
-
-        for deal in deals:
-            date_str = deal.get("dealDate", "")
-            if not date_str:
-                continue
-
-            try:
-                # Parse YYYY-MM-DD format
-                year_month = date_str[:7]  # Get YYYY-MM
-                monthly_deals[year_month] += 1
-                deal_dates.append(date_str)
-            except (ValueError, IndexError):
-                logger.warning(f"Invalid date format: {date_str}")
-                continue
-
-        if not monthly_deals:
-            raise ValueError("No valid deal dates found in deals list")
+        # Parse deal dates and group by month (with time period filtering)
+        deal_dates, monthly_deals, _ = self._parse_deal_dates(deals, time_period_months)
 
         # Calculate metrics
         total_deals = len(deal_dates)
@@ -1301,35 +1347,8 @@ class GovmapClient:
         if not deals:
             raise ValueError("Cannot calculate market liquidity from empty deals list")
 
-        from collections import defaultdict
-
-        # Group deals by quarter and month
-        quarterly_deals = defaultdict(int)
-        monthly_deals = defaultdict(int)
-        deal_dates = []
-
-        for deal in deals:
-            date_str = deal.get("dealDate", "")
-            if not date_str:
-                continue
-
-            try:
-                year = int(date_str[:4])
-                month = int(date_str[5:7])
-                quarter = (month - 1) // 3 + 1  # 1-4
-
-                year_month = f"{year}-{month:02d}"
-                year_quarter = f"{year}-Q{quarter}"
-
-                quarterly_deals[year_quarter] += 1
-                monthly_deals[year_month] += 1
-                deal_dates.append(date_str)
-            except (ValueError, IndexError):
-                logger.warning(f"Invalid date format: {date_str}")
-                continue
-
-        if not monthly_deals:
-            raise ValueError("No valid deal dates found in deals list")
+        # Parse deal dates and group by month and quarter (with time period filtering)
+        deal_dates, monthly_deals, quarterly_deals = self._parse_deal_dates(deals, time_period_months)
 
         # Calculate metrics
         total_deals = len(deal_dates)
