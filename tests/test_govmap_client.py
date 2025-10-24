@@ -278,4 +278,250 @@ class TestGovmapClient:
         
         with patch.object(client, 'autocomplete_address', return_value=mock_autocomplete_result):
             with pytest.raises(ValueError, match="Invalid coordinate format"):
-                client.find_recent_deals_for_address("test", years_back=1) 
+                client.find_recent_deals_for_address("test", years_back=1)
+
+
+class TestMarketAnalysisFunctions:
+    """Test cases for market analysis functions."""
+
+    def test_calculate_market_activity_score_success(self):
+        """Test successful market activity score calculation."""
+        client = GovmapClient()
+
+        # Sample deals with dates
+        deals = [
+            {"dealDate": "2023-01-15", "dealAmount": 1000000},
+            {"dealDate": "2023-01-20", "dealAmount": 1100000},
+            {"dealDate": "2023-02-10", "dealAmount": 1200000},
+            {"dealDate": "2023-03-05", "dealAmount": 1150000},
+            {"dealDate": "2023-04-12", "dealAmount": 1250000},
+        ]
+
+        result = client.calculate_market_activity_score(deals)
+
+        assert "total_deals" in result
+        assert "deals_per_month" in result
+        assert "activity_score" in result
+        assert "activity_level" in result
+        assert "trend" in result
+        assert "monthly_distribution" in result
+        assert result["total_deals"] == 5
+        assert result["deals_per_month"] > 0
+        assert 0 <= result["activity_score"] <= 100
+
+    def test_calculate_market_activity_score_empty_deals(self):
+        """Test market activity score with empty deals list."""
+        client = GovmapClient()
+
+        with pytest.raises(ValueError, match="Cannot calculate market activity from empty deals list"):
+            client.calculate_market_activity_score([])
+
+    def test_calculate_market_activity_score_invalid_dates(self):
+        """Test market activity score with invalid dates."""
+        client = GovmapClient()
+
+        # Deals with invalid dates
+        deals = [
+            {"dealDate": "", "dealAmount": 1000000},
+            {"dealAmount": 1100000},  # Missing dealDate
+        ]
+
+        with pytest.raises(ValueError, match="No valid deal dates found"):
+            client.calculate_market_activity_score(deals)
+
+    def test_calculate_market_activity_score_high_activity(self):
+        """Test market activity score with high activity."""
+        client = GovmapClient()
+
+        # Generate many deals in short period (high activity)
+        deals = [
+            {"dealDate": f"2023-01-{i:02d}", "dealAmount": 1000000 + i * 10000}
+            for i in range(1, 31)  # 30 deals in one month
+        ]
+
+        result = client.calculate_market_activity_score(deals)
+
+        assert result["activity_level"] == "very_high"
+        assert result["activity_score"] >= 90
+
+    def test_analyze_investment_potential_success(self):
+        """Test successful investment potential analysis."""
+        client = GovmapClient()
+
+        # Sample deals with price appreciation
+        deals = [
+            {"dealDate": "2022-01-15", "dealAmount": 1000000, "assetArea": 80, "price_per_sqm": 12500},
+            {"dealDate": "2022-06-10", "dealAmount": 1050000, "assetArea": 80, "price_per_sqm": 13125},
+            {"dealDate": "2023-01-05", "dealAmount": 1100000, "assetArea": 80, "price_per_sqm": 13750},
+            {"dealDate": "2023-06-12", "dealAmount": 1150000, "assetArea": 80, "price_per_sqm": 14375},
+        ]
+
+        result = client.analyze_investment_potential(deals)
+
+        assert "price_appreciation_rate" in result
+        assert "price_volatility" in result
+        assert "market_stability" in result
+        assert "price_trend" in result
+        assert "avg_price_per_sqm" in result
+        assert "investment_score" in result
+        assert "data_quality" in result
+        assert 0 <= result["investment_score"] <= 100
+        assert result["price_trend"] in ["increasing", "stable", "decreasing"]
+
+    def test_analyze_investment_potential_empty_deals(self):
+        """Test investment potential with empty deals list."""
+        client = GovmapClient()
+
+        with pytest.raises(ValueError, match="Cannot analyze investment potential from empty deals list"):
+            client.analyze_investment_potential([])
+
+    def test_analyze_investment_potential_insufficient_data(self):
+        """Test investment potential with insufficient data."""
+        client = GovmapClient()
+
+        # Only 2 deals (need at least 3)
+        deals = [
+            {"dealDate": "2023-01-15", "dealAmount": 1000000, "assetArea": 80, "price_per_sqm": 12500},
+            {"dealDate": "2023-06-10", "dealAmount": 1050000, "assetArea": 80, "price_per_sqm": 13125},
+        ]
+
+        with pytest.raises(ValueError, match="Insufficient data for investment analysis"):
+            client.analyze_investment_potential(deals)
+
+    def test_analyze_investment_potential_stable_market(self):
+        """Test investment potential with stable market (low volatility)."""
+        client = GovmapClient()
+
+        # Deals with consistent prices (very stable)
+        deals = [
+            {"dealDate": f"2023-{i:02d}-15", "dealAmount": 1000000 + i * 1000, "assetArea": 80, "price_per_sqm": 12500 + i * 12.5}
+            for i in range(1, 13)  # 12 months, slight increase
+        ]
+
+        result = client.analyze_investment_potential(deals)
+
+        assert result["market_stability"] in ["very_stable", "stable"]
+        assert result["price_volatility"] < 50
+
+    def test_get_market_liquidity_success(self):
+        """Test successful market liquidity calculation."""
+        client = GovmapClient()
+
+        # Sample deals across multiple quarters
+        deals = [
+            {"dealDate": "2023-01-15", "dealAmount": 1000000},
+            {"dealDate": "2023-02-20", "dealAmount": 1100000},
+            {"dealDate": "2023-05-10", "dealAmount": 1200000},
+            {"dealDate": "2023-06-05", "dealAmount": 1150000},
+            {"dealDate": "2023-09-12", "dealAmount": 1250000},
+            {"dealDate": "2023-10-18", "dealAmount": 1300000},
+        ]
+
+        result = client.get_market_liquidity(deals)
+
+        assert "total_deals" in result
+        assert "deals_per_month" in result
+        assert "deals_per_quarter" in result
+        assert "quarterly_breakdown" in result
+        assert "monthly_breakdown" in result
+        assert "velocity_score" in result
+        assert "liquidity_rating" in result
+        assert "trend_direction" in result
+        assert "most_active_period" in result
+        assert result["total_deals"] == 6
+        assert 0 <= result["velocity_score"] <= 100
+
+    def test_get_market_liquidity_empty_deals(self):
+        """Test market liquidity with empty deals list."""
+        client = GovmapClient()
+
+        with pytest.raises(ValueError, match="Cannot calculate market liquidity from empty deals list"):
+            client.get_market_liquidity([])
+
+    def test_get_market_liquidity_quarterly_breakdown(self):
+        """Test market liquidity quarterly breakdown."""
+        client = GovmapClient()
+
+        # Deals spread across specific quarters
+        deals = [
+            {"dealDate": "2023-01-15"},  # Q1
+            {"dealDate": "2023-02-20"},  # Q1
+            {"dealDate": "2023-05-10"},  # Q2
+            {"dealDate": "2023-08-05"},  # Q3
+            {"dealDate": "2023-11-12"},  # Q4
+        ]
+
+        result = client.get_market_liquidity(deals)
+
+        assert "2023-Q1" in result["quarterly_breakdown"]
+        assert "2023-Q2" in result["quarterly_breakdown"]
+        assert "2023-Q3" in result["quarterly_breakdown"]
+        assert "2023-Q4" in result["quarterly_breakdown"]
+        assert result["quarterly_breakdown"]["2023-Q1"] == 2
+
+    def test_filter_deals_by_criteria_property_type(self):
+        """Test filtering deals by property type."""
+        client = GovmapClient()
+
+        deals = [
+            {"assetTypeHeb": "דירה", "roomsNum": 3, "dealAmount": 1000000},
+            {"assetTypeHeb": "בית", "roomsNum": 5, "dealAmount": 2000000},
+            {"assetTypeHeb": "דירה", "roomsNum": 4, "dealAmount": 1500000},
+        ]
+
+        filtered = client.filter_deals_by_criteria(deals, property_type="דירה")
+
+        assert len(filtered) == 2
+        assert all(d["assetTypeHeb"] == "דירה" for d in filtered)
+
+    def test_filter_deals_by_criteria_rooms(self):
+        """Test filtering deals by room count."""
+        client = GovmapClient()
+
+        deals = [
+            {"assetRoomNum": 2, "dealAmount": 800000},
+            {"assetRoomNum": 3, "dealAmount": 1000000},
+            {"assetRoomNum": 4, "dealAmount": 1500000},
+            {"assetRoomNum": 5, "dealAmount": 2000000},
+        ]
+
+        filtered = client.filter_deals_by_criteria(deals, min_rooms=3, max_rooms=4)
+
+        assert len(filtered) == 2
+        assert all(3 <= d["assetRoomNum"] <= 4 for d in filtered)
+
+    def test_filter_deals_by_criteria_price_range(self):
+        """Test filtering deals by price range."""
+        client = GovmapClient()
+
+        deals = [
+            {"dealAmount": 800000},
+            {"dealAmount": 1000000},
+            {"dealAmount": 1500000},
+            {"dealAmount": 2000000},
+        ]
+
+        filtered = client.filter_deals_by_criteria(deals, min_price=900000, max_price=1600000)
+
+        assert len(filtered) == 2
+        assert all(900000 <= d["dealAmount"] <= 1600000 for d in filtered)
+
+    def test_calculate_deal_statistics_success(self):
+        """Test successful deal statistics calculation."""
+        client = GovmapClient()
+
+        deals = [
+            {"dealAmount": 1000000, "assetArea": 80, "price_per_sqm": 12500, "assetRoomNum": 3},
+            {"dealAmount": 1200000, "assetArea": 90, "price_per_sqm": 13333, "assetRoomNum": 4},
+            {"dealAmount": 900000, "assetArea": 70, "price_per_sqm": 12857, "assetRoomNum": 3},
+        ]
+
+        stats = client.calculate_deal_statistics(deals)
+
+        assert "count" in stats
+        assert "price_stats" in stats
+        assert "area_stats" in stats
+        assert "price_per_sqm_stats" in stats
+        assert stats["count"] == 3
+        assert stats["price_stats"]["mean"] > 0
+        assert stats["area_stats"]["mean"] > 0 

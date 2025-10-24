@@ -678,6 +678,82 @@ def get_deal_statistics(
         logger.error(f"Error in get_deal_statistics: {e}")
         return f"Error calculating deal statistics: {str(e)}"
 
+@mcp.tool()
+def get_market_activity_metrics(
+    address: str,
+    years_back: int = 2,
+    radius_meters: int = 100
+) -> str:
+    """Get comprehensive market activity and investment potential analysis.
+
+    This tool provides detailed market liquidity, activity scores, and investment
+    potential metrics. It combines activity scoring, liquidity analysis, and
+    investment potential into a single comprehensive report.
+
+    Args:
+        address: The address to analyze (in Hebrew or English)
+        years_back: How many years back to analyze (default: 2)
+        radius_meters: Search radius in meters (default: 100)
+
+    Returns:
+        JSON string containing:
+            - Market activity score and trends
+            - Market liquidity and velocity metrics
+            - Investment potential analysis
+            - Price appreciation and volatility
+    """
+    try:
+        # Get deals for the address
+        deals = client.find_recent_deals_for_address(address, years_back, radius_meters)
+
+        if not deals:
+            return json.dumps({
+                "address": address,
+                "error": "No deals found for analysis",
+                "years_back": years_back,
+                "radius_meters": radius_meters
+            }, ensure_ascii=False, indent=2)
+
+        # Calculate market activity score
+        try:
+            activity_metrics = client.calculate_market_activity_score(deals)
+        except ValueError as e:
+            activity_metrics = {"error": str(e)}
+
+        # Calculate market liquidity
+        try:
+            liquidity_metrics = client.get_market_liquidity(deals)
+        except ValueError as e:
+            liquidity_metrics = {"error": str(e)}
+
+        # Analyze investment potential
+        try:
+            investment_metrics = client.analyze_investment_potential(deals)
+        except ValueError as e:
+            investment_metrics = {"error": str(e)}
+
+        # Combine all metrics
+        return json.dumps({
+            "address": address,
+            "years_back": years_back,
+            "radius_meters": radius_meters,
+            "total_deals_analyzed": len(deals),
+            "market_activity": activity_metrics,
+            "market_liquidity": liquidity_metrics,
+            "investment_potential": investment_metrics,
+            "summary": {
+                "activity_level": activity_metrics.get("activity_level", "unknown"),
+                "liquidity_rating": liquidity_metrics.get("liquidity_rating", "unknown"),
+                "investment_score": investment_metrics.get("investment_score", 0),
+                "price_trend": investment_metrics.get("price_trend", "unknown"),
+                "market_stability": investment_metrics.get("market_stability", "unknown")
+            }
+        }, ensure_ascii=False, indent=2)
+
+    except Exception as e:
+        logger.error(f"Error in get_market_activity_metrics: {e}")
+        return f"Error analyzing market activity: {str(e)}"
+
 # Run the server
 if __name__ == "__main__":
     mcp.run() 
