@@ -524,4 +524,4 @@ class TestMarketAnalysisFunctions:
         assert "price_per_sqm_stats" in stats
         assert stats["count"] == 3
         assert stats["price_stats"]["mean"] > 0
-        assert stats["area_stats"]["mean"] > 0 
+        assert stats["area_stats"]["mean"] == pytest.approx(80.0)
