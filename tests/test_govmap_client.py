@@ -297,7 +297,7 @@ class TestMarketAnalysisFunctions:
             {"dealDate": "2023-04-12", "dealAmount": 1250000},
         ]
 
-        result = client.calculate_market_activity_score(deals)
+        result = client.calculate_market_activity_score(deals, time_period_months=None)
 
         assert "total_deals" in result
         assert "deals_per_month" in result
@@ -339,7 +339,7 @@ class TestMarketAnalysisFunctions:
             for i in range(1, 31)  # 30 deals in one month
         ]
 
-        result = client.calculate_market_activity_score(deals)
+        result = client.calculate_market_activity_score(deals, time_period_months=None)
 
         assert result["activity_level"] == "very_high"
         assert result["activity_score"] >= 90
@@ -417,7 +417,7 @@ class TestMarketAnalysisFunctions:
             {"dealDate": "2023-10-18", "dealAmount": 1300000},
         ]
 
-        result = client.get_market_liquidity(deals)
+        result = client.get_market_liquidity(deals, time_period_months=None)
 
         assert "total_deals" in result
         assert "deals_per_month" in result
@@ -451,7 +451,7 @@ class TestMarketAnalysisFunctions:
             {"dealDate": "2023-11-12"},  # Q4
         ]
 
-        result = client.get_market_liquidity(deals)
+        result = client.get_market_liquidity(deals, time_period_months=None)
 
         assert "2023-Q1" in result["quarterly_breakdown"]
         assert "2023-Q2" in result["quarterly_breakdown"]
