@@ -106,14 +106,16 @@ The codebase follows a three-layer architecture:
 
 ## Key Files
 
-- `nadlan_mcp/govmap.py` - Core API client with ~1000 lines of business logic
-- `nadlan_mcp/fastmcp_server.py` - MCP tool definitions (7 implemented tools)
+- `nadlan_mcp/govmap.py` - Core API client with ~1,378 lines of business logic
+  - **NOTE:** Will be refactored into package in Phase 3 (see `.cursor/plans/PHASE3-REFACTORING.md`)
+- `nadlan_mcp/fastmcp_server.py` - MCP tool definitions (10 implemented tools)
 - `nadlan_mcp/config.py` - Configuration management
 - `run_fastmcp_server.py` - Server entry point
-- `tests/test_govmap_client.py` - Main test suite
+- `tests/test_govmap_client.py` - Main test suite (27 tests)
 - `USECASES.md` - **Product roadmap and feature status** (essential reading)
 - `ARCHITECTURE.md` - Detailed system architecture and design decisions
 - `TASKS.md` - Implementation tasks and progress tracking
+- `.cursor/plans/PHASE3-REFACTORING.md` - Detailed refactoring plan for Phase 3
 
 ## Available MCP Tools
 

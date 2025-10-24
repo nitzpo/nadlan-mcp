@@ -371,7 +371,78 @@ GOVMAP_DEFAULT_DEAL_LIMIT=100
 
 ## Future Architecture Evolution
 
-### Phase 2: Data Models (Pydantic)
+### Phase 3: Package Refactoring (PLANNED)
+
+**See `.cursor/plans/PHASE3-REFACTORING.md` for detailed plan**
+
+Refactor `govmap.py` (1,378 lines) into modular package:
+
+```
+nadlan_mcp/
+├── __init__.py                 # Backward compatibility
+├── config.py                   # ✅ Configuration
+├── main.py                     # ✅ Entry point
+├── fastmcp_server.py          # ✅ MCP tools
+└── govmap/                     # 📦 NEW PACKAGE
+    ├── __init__.py             # Public API exports
+    ├── client.py               # Core API client (~300 lines)
+    ├── validators.py           # Input validation (~100 lines)
+    ├── filters.py              # Deal filtering (~150 lines)
+    ├── statistics.py           # Statistical calculations (~150 lines)
+    ├── market_analysis.py      # Market analysis (~400 lines)
+    ├── utils.py                # Helper utilities (~100 lines)
+    └── models.py               # Pydantic models (optional)
+```
+
+**Benefits:**
+- ✅ Single Responsibility Principle - each module has one job
+- ✅ Easier testing - test modules in isolation
+- ✅ Better maintainability - smaller files (100-400 lines)
+- ✅ Reusability - import only what you need
+- ✅ 100% backward compatible - existing code still works
+
+**Module Responsibilities:**
+
+1. **client.py** - Pure API interactions with Govmap
+   - HTTP requests, rate limiting, response parsing
+   - No business logic, just API calls
+
+2. **validators.py** - Input validation
+   - Address, coordinate, integer, date validation
+   - Pure functions, clear error messages
+
+3. **filters.py** - Deal filtering logic
+   - Property type, rooms, price, area, floor filters
+   - Composable filter functions
+
+4. **statistics.py** - Statistical calculations
+   - Mean, median, percentiles, std dev
+   - Pure math functions, no I/O
+
+5. **market_analysis.py** - Market analysis functions
+   - Activity scoring, investment analysis, liquidity
+   - Works with data, no API calls
+
+6. **utils.py** - Shared utilities
+   - Address matching, text normalization, helpers
+   - Reusable across modules
+
+7. **models.py** - Pydantic data models (optional)
+   - Deal, Address, MarketMetrics, DealStatistics
+   - Type safety and validation
+
+**Backward Compatibility:**
+```python
+# OLD CODE (still works)
+from nadlan_mcp import GovmapClient
+client = GovmapClient()
+
+# NEW CODE (also works)
+from nadlan_mcp.govmap import GovmapClient
+from nadlan_mcp.govmap.filters import filter_deals_by_criteria
+```
+
+### Phase 4: Pydantic Data Models (Optional)
 
 Add structured models for type safety:
 ```python
@@ -386,20 +457,7 @@ class Deal(BaseModel):
     # ...
 ```
 
-### Phase 3: Separation of Concerns
-
-```
-nadlan_mcp/
-├── api_client.py       # Pure API communication
-├── analyzers/
-│   ├── market.py       # Market analysis logic
-│   ├── valuation.py    # Valuation helpers
-│   └── filtering.py    # Deal filtering
-├── models.py           # Pydantic models
-└── fastmcp_server.py   # Thin MCP tool definitions
-```
-
-### Phase 4: Database Layer (Optional)
+### Phase 5: Database Layer (Future - Optional)
 
 For historical tracking and faster queries:
 ```

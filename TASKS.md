@@ -55,29 +55,52 @@ None - Phase 2 is complete!
 
 ## 📋 To-Do (Next Priority)
 
-### Phase 3: Architecture Improvements
+### Phase 3: Architecture Improvements & Package Refactoring
 
-#### 3.1 Data Models
-- [ ] Create `models.py` with Pydantic models
-  - [ ] Deal model
-  - [ ] Address model
-  - [ ] MarketAnalysis model
-  - [ ] PropertyValuation model
-  - [ ] Filter models (DealFilters, etc.)
-- [ ] Update functions to use models
+**See `.cursor/plans/PHASE3-REFACTORING.md` for detailed implementation plan**
+
+#### 3.1 Refactor govmap.py into Package Structure
+- [ ] **Create package structure** (`nadlan_mcp/govmap/`)
+  - [ ] Create `govmap/__init__.py` with public API exports
+  - [ ] Create `govmap/client.py` - Core API client (~300 lines)
+  - [ ] Create `govmap/validators.py` - Input validation (~100 lines)
+  - [ ] Create `govmap/filters.py` - Deal filtering (~150 lines)
+  - [ ] Create `govmap/statistics.py` - Statistical calculations (~150 lines)
+  - [ ] Create `govmap/market_analysis.py` - Market analysis (~400 lines)
+  - [ ] Create `govmap/utils.py` - Helper utilities (~100 lines)
+
+- [ ] **Migrate code by responsibility**
+  - [ ] Move validation methods to `validators.py`
+  - [ ] Move filtering logic to `filters.py`
+  - [ ] Move statistics functions to `statistics.py`
+  - [ ] Move market analysis to `market_analysis.py`
+  - [ ] Move utility helpers to `utils.py`
+  - [ ] Keep only API methods in `client.py`
+
+- [ ] **Update imports & maintain backward compatibility**
+  - [ ] Update `nadlan_mcp/__init__.py` for backward compatibility
+  - [ ] Update `fastmcp_server.py` imports
+  - [ ] Update `main.py` imports
+  - [ ] Update test file imports
+  - [ ] Verify all existing code still works
+
+- [ ] **Reorganize tests**
+  - [ ] Create `tests/govmap/` directory
+  - [ ] Create separate test files for each module
+  - [ ] Migrate existing tests to new structure
+  - [ ] Add tests for newly isolated modules
+  - [ ] Ensure 100% backward compatibility
+
+#### 3.2 Pydantic Data Models (Optional Enhancement)
+- [ ] Create `govmap/models.py` with Pydantic models
+  - [ ] `Deal` model - Real estate deal
+  - [ ] `Address` model - Address with coordinates
+  - [ ] `MarketMetrics` model - Market analysis results
+  - [ ] `DealStatistics` model - Statistical results
+  - [ ] `DealFilters` model - Filter criteria
+- [ ] Update functions to use/return models (optional)
 - [ ] Add model validation tests
-
-#### 3.2 Separation of Concerns
-- [ ] Refactor fastmcp_server.py:
-  - [ ] Move analysis logic to dedicated modules
-  - [ ] Keep only MCP tool definitions in fastmcp_server.py
-- [ ] Create `api_client.py` for pure API interactions
-- [ ] Create `analyzers/` package:
-  - [ ] `analyzers/market.py` - Market analysis functions
-  - [ ] `analyzers/filtering.py` - Deal filtering logic
-  - [ ] `analyzers/valuation.py` - Valuation helpers
-- [ ] Update imports and dependencies
-- [ ] Update tests
+- [ ] Add type stubs if needed
 
 #### 3.3 LLM-Friendly Tool Design
 - [ ] Add `summarized_response: bool = False` parameter to all tools
@@ -85,6 +108,13 @@ None - Phase 2 is complete!
 - [ ] Update tool docstrings with parameter descriptions
 - [ ] Test both modes (structured and summarized)
 - [ ] Update documentation with examples
+
+#### 3.4 Documentation Updates
+- [ ] Update ARCHITECTURE.md with new package structure
+- [ ] Update CLAUDE.md with refactored imports
+- [ ] Add module-level docstrings to all new files
+- [ ] Update README.md if needed
+- [ ] Document migration guide for users
 
 ### Phase 4: Testing & Quality
 
