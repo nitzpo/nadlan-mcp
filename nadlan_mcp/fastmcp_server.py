@@ -63,13 +63,29 @@ def autocomplete_address(search_text: str) -> str:
         # Format results for better readability
         formatted_results = []
         for result in response['results']:
+            # Parse coordinates from WKT POINT format: "POINT(longitude latitude)"
+            shape_str = result.get("shape", "")
+            coordinates = {}
+            if shape_str and shape_str.startswith("POINT("):
+                try:
+                    coords_str = shape_str[6:-1]  # Remove "POINT(" and ")"
+                    coords = coords_str.split()
+                    if len(coords) == 2:
+                        coordinates = {
+                            "longitude": float(coords[0]),
+                            "latitude": float(coords[1])
+                        }
+                except (ValueError, IndexError) as e:
+                    logger.warning(f"Failed to parse coordinates from shape: {shape_str}, error: {e}")
+
             formatted_results.append({
-                "address": result.get("addressLabel", ""),
-                "settlement": result.get("settlementNameHeb", ""),
-                "coordinates": result.get("coordinates", {}),
-                "polygon_id": result.get("polygon_id")
+                "text": result.get("text", ""),
+                "id": result.get("id", ""),
+                "type": result.get("type", ""),
+                "score": result.get("score", 0),
+                "coordinates": coordinates
             })
-        
+
         return json.dumps(formatted_results, ensure_ascii=False, indent=2)
         
     except Exception as e:
