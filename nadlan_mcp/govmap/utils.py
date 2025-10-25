@@ -5,6 +5,7 @@ This module provides shared helper functions with no external dependencies
 (except standard library).
 """
 
+import re
 from typing import Tuple
 
 
@@ -129,8 +130,6 @@ def extract_floor_number(floor_str: str) -> int | None:
             return num
 
     # Try to extract number from string
-    import re
-
     numbers = re.findall(r"\d+", floor_str)
     if numbers:
         try:
