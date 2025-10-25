@@ -66,7 +66,7 @@ def calculate_deal_statistics(deals: List[Dict[str, Any]]) -> Dict[str, Any]:
         sorted_prices = sorted(prices)
         stats["price_stats"] = {
             "mean": round(sum(prices) / len(prices), 2),
-            "median": sorted_prices[len(sorted_prices) // 2],
+            "median": (sorted_prices[len(sorted_prices) // 2] + sorted_prices[(len(sorted_prices) - 1) // 2]) / 2,
             "min": min(prices),
             "max": max(prices),
             "p25": sorted_prices[len(sorted_prices) // 4],
