@@ -93,10 +93,15 @@ The codebase follows a three-layer architecture:
 - Main tools: `find_recent_deals_for_address`, `analyze_market_trends`, `compare_addresses`
 - **Important:** Tools return structured JSON by default; use `summarized_response=True` for condensed summaries
 
-### 2. Business Logic Layer (`nadlan_mcp/govmap.py`)
-- `GovmapClient` class implements all API interactions
+### 2. Business Logic Layer (`nadlan_mcp/govmap/` package)
+- Modular package with specialized modules (see ARCHITECTURE.md for details)
+- `client.py` - GovmapClient class with core API methods
+- `validators.py` - Input validation functions
+- `filters.py` - Deal filtering logic
+- `statistics.py` - Statistical calculations
+- `market_analysis.py` - Market analysis functions
+- `utils.py` - Helper utilities
 - Reliability features: retry logic with exponential backoff, rate limiting, input validation
-- Helper functions for data processing, filtering, and analysis
 - **Key Design Principle:** MCP provides data, LLM provides intelligence - avoid complex analysis in the MCP layer
 
 ### 3. Configuration Layer (`nadlan_mcp/config.py`)
@@ -106,16 +111,22 @@ The codebase follows a three-layer architecture:
 
 ## Key Files
 
-- `nadlan_mcp/govmap.py` - Core API client with ~1,378 lines of business logic
-  - **NOTE:** Will be refactored into package in Phase 3 (see `.cursor/plans/PHASE3-REFACTORING.md`)
+- `nadlan_mcp/govmap/` - **✅ Refactored modular package** (Phase 3 complete)
+  - `client.py` - Core API client (~30KB, GovmapClient class)
+  - `validators.py` - Input validation (~3KB)
+  - `filters.py` - Deal filtering (~5KB)
+  - `statistics.py` - Statistical calculations (~4KB)
+  - `market_analysis.py` - Market analysis (~17KB)
+  - `utils.py` - Helper utilities (~4KB)
+  - `__init__.py` - Package exports for backward compatibility
 - `nadlan_mcp/fastmcp_server.py` - MCP tool definitions (10 implemented tools)
 - `nadlan_mcp/config.py` - Configuration management
 - `run_fastmcp_server.py` - Server entry point
-- `tests/test_govmap_client.py` - Main test suite (27 tests)
+- `tests/test_govmap_client.py` - Main test suite (34 tests, all passing)
 - `USECASES.md` - **Product roadmap and feature status** (essential reading)
 - `ARCHITECTURE.md` - Detailed system architecture and design decisions
 - `TASKS.md` - Implementation tasks and progress tracking
-- `.cursor/plans/PHASE3-REFACTORING.md` - Detailed refactoring plan for Phase 3
+- `.cursor/plans/PHASE3-REFACTORING.md` - Detailed refactoring plan (✅ completed)
 
 ## Available MCP Tools
 
@@ -212,11 +223,12 @@ GOVMAP_DEFAULT_DEAL_LIMIT=100
 
 ## Development Roadmap
 
-See `TASKS.md` for complete implementation plan. Current focus:
-- **Phase 2.2:** Market analysis tools (in progress)
-- **Phase 2.3:** Enhanced filtering (mostly complete)
-- **Phase 3:** Architecture improvements with Pydantic models
-- **Phase 4:** Expanded test coverage
+See `TASKS.md` for complete implementation plan. Current status:
+- **Phase 2.2:** Market analysis tools (✅ complete)
+- **Phase 2.3:** Enhanced filtering (✅ complete)
+- **Phase 3:** Package refactoring (✅ complete - monolithic govmap.py refactored into modular package)
+- **Phase 4:** Pydantic data models (planned)
+- **Phase 5:** Expanded test coverage (ongoing)
 
 ## Common Tasks
 
@@ -230,10 +242,11 @@ See `TASKS.md` for complete implementation plan. Current focus:
 
 ### Adding New API Endpoint Support
 
-1. Add method to `GovmapClient` class in `govmap.py`
-2. Implement validation, retry logic, rate limiting
-3. Add unit tests in `tests/test_govmap_client.py`
-4. Optionally expose as MCP tool
+1. Add method to `GovmapClient` class in `govmap/client.py`
+2. Implement validation (use `validators.py` functions)
+3. Implement retry logic and rate limiting (follow existing patterns)
+4. Add unit tests in `tests/test_govmap_client.py`
+5. Optionally expose as MCP tool in `fastmcp_server.py`
 
 ### Modifying Configuration
 
@@ -265,6 +278,13 @@ The client uses these Govmap API endpoints:
 
 - This project uses **FastMCP**, not the standard MCP library
 - All coordinate tuples are `(longitude, latitude)` in ITM projection (Israeli Transverse Mercator)
-- When reading `govmap.py`, note it's ~1000 lines with multiple helper functions - use search/grep to find specific methods
-- Floor numbers in Hebrew (e.g., "קרקע", "מרתף") are parsed by `_extract_floor_number()`
+- The `govmap` package is now modular - each module has a specific responsibility:
+  - `client.py` - API calls and HTTP logic
+  - `validators.py` - Input validation
+  - `filters.py` - Deal filtering
+  - `statistics.py` - Statistical calculations
+  - `market_analysis.py` - Market analysis metrics
+  - `utils.py` - Helper utilities
+- Floor numbers in Hebrew (e.g., "קרקע", "מרתף") are parsed by `extract_floor_number()` in `utils.py`
 - Deal types: 1 = first hand/new construction, 2 = second hand/resale
+- Backward compatibility maintained: `from nadlan_mcp.govmap import GovmapClient` still works

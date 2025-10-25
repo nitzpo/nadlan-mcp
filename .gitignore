@@ -292,3 +292,8 @@ nadlan_mcp/__pycache__/
 nadlan_mcp/.env
 nadlan_mcp/.env.*
 nadlan_mcp/local_settings.py
+
+# Claude Code workspace and local config
+.claude/
+.mcp.json
+PHASE3-PLAN-SUMMARY.md
