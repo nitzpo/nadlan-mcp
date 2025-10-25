@@ -1,14 +1,16 @@
 # Test Coverage Report - Phase 3 Refactoring
 
 **Generated:** 2025-10-25
+**Updated:** 2025-10-25 (Added comprehensive unit tests)
 **Branch:** phase-3
-**Total Tests:** 34 (all passing in 0.14s)
+**Total Tests:** 138 (all passing in 0.50s) ✅ **+104 new tests**
 
 ## Executive Summary
 
-✅ **Overall Status:** GOOD - Most functionality is well-tested
-⚠️ **Concerns:** 1 bug found in `autocomplete_address` MCP tool, some modules lack direct unit tests
-📊 **Coverage:** Indirect coverage is good through integration tests, but direct unit tests for new modules would improve testability
+✅ **Overall Status:** EXCELLENT - Comprehensive test coverage across all modules
+✅ **Bug Fixed:** `autocomplete_address` MCP tool bug fixed
+✅ **Coverage:** Complete unit test coverage for validators, utils, and all MCP tools
+🎉 **Achievement:** Increased from 34 to 138 tests (+304% improvement)
 
 ## Test Coverage by Module
 
@@ -22,13 +24,18 @@
 | `market_analysis.py` | 4 functions | ✅ High | 6 dedicated tests for market analysis |
 | `utils.py` | `is_same_building` | ✅ Good | 1 dedicated test |
 
-### ⚠️ Missing Direct Unit Tests
+### ✅ NEW: Comprehensive Unit Tests Added
 
-| Module | Functions | Test Coverage | Impact | Recommendation |
-|--------|-----------|---------------|--------|----------------|
-| `validators.py` | 4 validation functions | ⚠️ Indirect only | Low | Add unit tests for edge cases |
-| `utils.py` | `calculate_distance`, `extract_floor_number` | ⚠️ Indirect only | Low | Add unit tests for Hebrew floor parsing |
-| `market_analysis.py` | `parse_deal_dates` (helper) | ⚠️ Indirect only | Low | Already tested via parent functions |
+| Module | Test File | Tests | Coverage |
+|--------|-----------|-------|----------|
+| `validators.py` | `tests/govmap/test_validators.py` | 32 tests | ✅ Complete - All validation functions with edge cases |
+| `utils.py` | `tests/govmap/test_utils.py` | 36 tests | ✅ Complete - Distance, address matching, Hebrew floors |
+| MCP Tools | `tests/test_fastmcp_tools.py` | 36 tests | ✅ Complete - All 10 MCP tools with mocking |
+
+**NEW Test Breakdown:**
+- **Validators:** 32 tests covering address, coordinates, positive int, deal type validation
+- **Utils:** 36 tests covering distance calculation, address matching, Hebrew floor parsing
+- **MCP Tools:** 36 tests covering all 10 tools including error handling and edge cases
 
 ## E2E Test Results (MCP Tools)
 
