@@ -38,6 +38,8 @@ Nadlan-MCP is a Model Context Protocol (MCP) server that provides Israeli real e
 
 ## Development Commands
 
+- Don't forget the virtualenv in venv/
+
 ### Running the Server
 
 ```bash
