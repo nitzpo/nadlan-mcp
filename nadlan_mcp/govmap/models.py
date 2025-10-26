@@ -228,7 +228,7 @@ class MarketActivityScore(BaseModel):
     total_deals: int = Field(..., description="Total deals in period")
     deals_per_month: float = Field(..., description="Average deals per month")
     trend: str = Field(..., description="Market trend (increasing, stable, decreasing)")
-    time_period_months: int = Field(..., description="Analysis period in months")
+    time_period_months: Optional[int] = Field(None, description="Analysis period in months (None = all data)")
     monthly_distribution: Dict[str, int] = Field(
         default_factory=dict,
         description="Deals per month (YYYY-MM: count)"
@@ -275,7 +275,7 @@ class LiquidityMetrics(BaseModel):
     """
     liquidity_score: float = Field(..., description="Overall liquidity score (0-100)", ge=0, le=100)
     total_deals: int = Field(..., description="Total deals in period")
-    time_period_months: int = Field(..., description="Analysis period in months")
+    time_period_months: Optional[int] = Field(None, description="Analysis period in months (None = all data)")
     avg_deals_per_month: float = Field(..., description="Average deals per month")
     deal_velocity: float = Field(..., description="Deal velocity (deals per month)")
     market_activity_level: str = Field(..., description="Activity level (very_high, high, moderate, low, very_low)")

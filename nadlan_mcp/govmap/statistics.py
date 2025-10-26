@@ -121,16 +121,23 @@ def calculate_deal_statistics(deals: List[Deal]) -> DealStatistics:
     date_range_dict = None
     if deal_dates:
         try:
-            # Parse ISO date strings to get earliest and latest
+            # Convert dates to ISO strings for consistent formatting
+            from datetime import date as date_type
             parsed_dates = []
-            for date_str in deal_dates:
+            for d in deal_dates:
                 try:
-                    # Handle ISO format with timezone (e.g., "2025-01-01T00:00:00.000Z")
-                    if 'T' in date_str:
-                        date_str = date_str.split('T')[0]
-                    parsed_dates.append(date_str)
+                    # Handle date objects (from Pydantic models)
+                    if isinstance(d, date_type):
+                        parsed_dates.append(d.isoformat())
+                    else:
+                        # Handle string dates
+                        date_str = str(d)
+                        # Handle ISO format with timezone (e.g., "2025-01-01T00:00:00.000Z")
+                        if 'T' in date_str:
+                            date_str = date_str.split('T')[0]
+                        parsed_dates.append(date_str)
                 except (ValueError, TypeError):
-                    logger.warning(f"Invalid date format: {date_str}")
+                    logger.warning(f"Invalid date format: {d}")
                     continue
 
             if parsed_dates:
@@ -140,7 +147,7 @@ def calculate_deal_statistics(deals: List[Deal]) -> DealStatistics:
                     "latest": sorted_dates[-1],
                 }
         except (ValueError, TypeError):
-            logger.warning("Invalid date format: {date_range_dict}")
+            logger.warning("Invalid date format in date range calculation")
             pass
 
     return DealStatistics(

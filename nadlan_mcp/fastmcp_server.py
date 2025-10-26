@@ -44,7 +44,8 @@ def strip_bloat_fields(deals: List[Deal]) -> List[Dict[str, Any]]:
     result = []
     for deal in deals:
         # Convert Deal model to dict, excluding None values for cleaner output
-        deal_dict = deal.model_dump(exclude_none=True)
+        # Use mode='json' to serialize dates as ISO strings
+        deal_dict = deal.model_dump(mode='json', exclude_none=True)
 
         # Remove bloat fields
         filtered_dict = {k: v for k, v in deal_dict.items() if k not in bloat_fields}
@@ -342,10 +343,12 @@ def analyze_market_trends(address: str, years_back: int = 3, radius_meters: int 
         
         # Simplified processing - extract only essential data
         for deal in deals:
-            date_str = deal.deal_date
-            if not date_str:
+            if not deal.deal_date:
                 continue
 
+            # Convert date to string for parsing
+            from datetime import date as date_type
+            date_str = deal.deal_date.isoformat() if isinstance(deal.deal_date, date_type) else str(deal.deal_date)
             year = date_str[:4]
             price = deal.deal_amount
             area = deal.asset_area
@@ -450,7 +453,7 @@ def analyze_market_trends(address: str, years_back: int = 3, radius_meters: int 
             "key_insights": {
                 "most_active_year": max(yearly_trends.keys(), key=lambda y: yearly_trends[y]['deal_count']) if yearly_trends else None,
                 "highest_avg_price_year": max(yearly_trends.keys(), key=lambda y: yearly_trends[y]['avg_price_per_sqm']) if yearly_trends else None,
-                "deal_source_summary": f"Building: {len([d for d in deals if d.get('deal_source') == 'same_building'])}, Street: {len([d for d in deals if d.get('deal_source') == 'street'])}, Neighborhood: {len([d for d in deals if d.get('deal_source') == 'neighborhood'])}"
+                "deal_source_summary": f"Building: {len([d for d in deals if getattr(d, 'deal_source', None) == 'same_building'])}, Street: {len([d for d in deals if getattr(d, 'deal_source', None) == 'street'])}, Neighborhood: {len([d for d in deals if getattr(d, 'deal_source', None) == 'neighborhood'])}"
             }
         }, ensure_ascii=False, indent=2)
         

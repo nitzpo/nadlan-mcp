@@ -7,7 +7,7 @@ Focused on providing data metrics; the LLM interprets them for investment advice
 
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 from .models import Deal, MarketActivityScore, InvestmentAnalysis, LiquidityMetrics
@@ -68,11 +68,13 @@ def parse_deal_dates(
     deal_dates = []
 
     for deal in deals:
-        date_str = deal.deal_date
-        if not date_str:
+        if not deal.deal_date:
             continue
 
         try:
+            # Convert date to string for comparison and parsing
+            date_str = deal.deal_date.isoformat() if isinstance(deal.deal_date, date) else str(deal.deal_date)
+
             # Filter by time period if specified
             if cutoff_date is not None and date_str < cutoff_date_str:
                 continue
@@ -100,7 +102,7 @@ def parse_deal_dates(
 
 
 def calculate_market_activity_score(
-    deals: List[Deal], time_period_months: int = 12
+    deals: List[Deal], time_period_months: Optional[int] = 12
 ) -> MarketActivityScore:
     """
     Calculate market activity and liquidity metrics.
@@ -209,10 +211,12 @@ def analyze_investment_potential(deals: List[Deal]) -> InvestmentAnalysis:
     price_data = []
     for deal in deals:
         price_per_sqm = deal.price_per_sqm  # Use computed field from Deal model
-        date_str = deal.deal_date
 
-        if price_per_sqm and price_per_sqm > 0 and date_str:
+        if price_per_sqm and price_per_sqm > 0 and deal.deal_date:
             try:
+                # Convert date to string for parsing
+                date_str = deal.deal_date.isoformat() if isinstance(deal.deal_date, date) else str(deal.deal_date)
+
                 # Parse date for sorting
                 year = int(date_str[:4])
                 month = int(date_str[5:7])
@@ -319,7 +323,7 @@ def analyze_investment_potential(deals: List[Deal]) -> InvestmentAnalysis:
 
 
 def get_market_liquidity(
-    deals: List[Deal], time_period_months: int = 12
+    deals: List[Deal], time_period_months: Optional[int] = 12
 ) -> LiquidityMetrics:
     """
     Get detailed market liquidity and turnover metrics.
