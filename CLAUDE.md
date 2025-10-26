@@ -38,6 +38,8 @@ Nadlan-MCP is a Model Context Protocol (MCP) server that provides Israeli real e
 
 ## Development Commands
 
+- Don't forget the virtualenv in venv/
+
 ### Running the Server
 
 ```bash
@@ -85,48 +87,63 @@ flake8 nadlan_mcp/
 
 ## Architecture
 
-The codebase follows a three-layer architecture:
+The codebase follows a four-layer architecture:
 
 ### 1. MCP Tools Layer (`nadlan_mcp/fastmcp_server.py`)
-- Exposes 7 tools to LLM clients via FastMCP
+- Exposes 10 tools to LLM clients via FastMCP
 - Handles tool parameter validation and JSON response formatting
+- Serializes Pydantic models to JSON using `.model_dump()`
 - Main tools: `find_recent_deals_for_address`, `analyze_market_trends`, `compare_addresses`
-- **Important:** Tools return structured JSON by default; use `summarized_response=True` for condensed summaries
 
-### 2. Business Logic Layer (`nadlan_mcp/govmap/` package)
+### 2. Data Models Layer (`nadlan_mcp/govmap/models.py`) **✨ NEW in v2.0**
+- **Pydantic v2 models** for type safety and validation
+- 9 comprehensive models covering all data structures
+- Key models: `Deal`, `AutocompleteResponse`, `DealStatistics`, `MarketActivityScore`
+- Features:
+  - Computed fields (e.g., `price_per_sqm` auto-calculated)
+  - Field aliases (API camelCase ↔ Python snake_case)
+  - Validation with clear error messages
+  - Immutable coordinates for data integrity
+- **Breaking Change:** All API methods return models, not dicts (v2.0.0)
+
+### 3. Business Logic Layer (`nadlan_mcp/govmap/` package)
 - Modular package with specialized modules (see ARCHITECTURE.md for details)
-- `client.py` - GovmapClient class with core API methods
+- `client.py` - GovmapClient class (returns Pydantic models)
+- `models.py` - Pydantic data models **✨ NEW**
 - `validators.py` - Input validation functions
-- `filters.py` - Deal filtering logic
-- `statistics.py` - Statistical calculations
-- `market_analysis.py` - Market analysis functions
+- `filters.py` - Deal filtering logic (accepts/returns models)
+- `statistics.py` - Statistical calculations (returns models)
+- `market_analysis.py` - Market analysis functions (returns models)
 - `utils.py` - Helper utilities
 - Reliability features: retry logic with exponential backoff, rate limiting, input validation
 - **Key Design Principle:** MCP provides data, LLM provides intelligence - avoid complex analysis in the MCP layer
 
-### 3. Configuration Layer (`nadlan_mcp/config.py`)
+### 4. Configuration Layer (`nadlan_mcp/config.py`)
 - `GovmapConfig` dataclass with environment variable support
 - Global config accessed via `get_config()` and `set_config()`
 - All timeouts, retries, rate limits are configurable
 
 ## Key Files
 
-- `nadlan_mcp/govmap/` - **✅ Refactored modular package** (Phase 3 complete)
-  - `client.py` - Core API client (~30KB, GovmapClient class)
+- `nadlan_mcp/govmap/` - **✅ Refactored modular package** (Phase 3 & 4 complete)
+  - `models.py` - **✨ Pydantic v2 data models** (~338 lines, 9 models) **NEW in v2.0**
+  - `client.py` - Core API client (~30KB, returns Pydantic models)
   - `validators.py` - Input validation (~3KB)
-  - `filters.py` - Deal filtering (~5KB)
-  - `statistics.py` - Statistical calculations (~4KB)
-  - `market_analysis.py` - Market analysis (~17KB)
+  - `filters.py` - Deal filtering (~5KB, accepts/returns models)
+  - `statistics.py` - Statistical calculations (~4KB, returns models)
+  - `market_analysis.py` - Market analysis (~17KB, returns models)
   - `utils.py` - Helper utilities (~4KB)
   - `__init__.py` - Package exports for backward compatibility
 - `nadlan_mcp/fastmcp_server.py` - MCP tool definitions (10 implemented tools)
 - `nadlan_mcp/config.py` - Configuration management
 - `run_fastmcp_server.py` - Server entry point
-- `tests/test_govmap_client.py` - Main test suite (34 tests, all passing)
+- `tests/govmap/test_models.py` - **✨ Model tests** (50+ tests) **NEW**
+- `tests/test_govmap_client.py` - Main test suite (34 tests, partially updated for v2.0)
+- `MIGRATION.md` - **✨ v1.x → v2.0 migration guide** **NEW**
 - `USECASES.md` - **Product roadmap and feature status** (essential reading)
 - `ARCHITECTURE.md` - Detailed system architecture and design decisions
 - `TASKS.md` - Implementation tasks and progress tracking
-- `.cursor/plans/PHASE3-REFACTORING.md` - Detailed refactoring plan (✅ completed)
+- `.cursor/plans/PHASE4.1-STATUS.md` - Phase 4.1 completion status **NEW**
 
 ## Available MCP Tools
 
@@ -151,6 +168,40 @@ The codebase follows a three-layer architecture:
 
 ## Important Patterns
 
+### Using Pydantic Models (v2.0+) **✨ NEW**
+
+All API methods now return Pydantic models instead of dicts:
+
+```python
+from nadlan_mcp.govmap import GovmapClient
+from nadlan_mcp.govmap.models import Deal, AutocompleteResponse
+
+client = GovmapClient()
+
+# Returns AutocompleteResponse model
+result = client.autocomplete_address("חולון")
+address_text = result.results[0].text  # Model attribute
+coords = result.results[0].coordinates  # Optional[CoordinatePoint]
+
+# Returns List[Deal]
+deals = client.get_street_deals("polygon123")
+for deal in deals:
+    price = deal.deal_amount  # float (snake_case)
+    area = deal.asset_area  # Optional[float]
+    price_per_sqm = deal.price_per_sqm  # Computed field!
+
+# Serialize to dict/JSON when needed
+deal_dict = deal.model_dump()  # Convert to dict
+deal_json = deal.model_dump_json()  # Convert to JSON string
+```
+
+**Key points:**
+- Use model attributes (e.g., `deal.deal_amount`), not dict access (e.g., `deal["dealAmount"]`)
+- Field names are snake_case in Python (e.g., `deal_amount` not `dealAmount`)
+- Computed fields like `price_per_sqm` are automatically calculated
+- Use `.model_dump()` to serialize models to dicts for JSON/MCP responses
+- See `MIGRATION.md` for complete migration guide
+
 ### Retry Logic
 All API calls use automatic retry with exponential backoff (configurable via `GOVMAP_MAX_RETRIES`). The pattern is implemented in `GovmapClient._make_request()`.
 
@@ -161,6 +212,7 @@ Client enforces rate limiting via `_rate_limit()` method, tracking last request 
 - Validation errors: Raise `ValueError` immediately with clear message
 - Network errors: Retry with backoff, then raise `requests.RequestException`
 - API response errors: Raise `ValueError` with specific details
+- Pydantic validation errors: Logged as warnings, invalid deals are skipped
 - **Never return empty lists on error** - always raise exceptions
 
 ### Input Validation
@@ -168,6 +220,7 @@ All user inputs are validated before API calls:
 - `_validate_address()` - address strings
 - `_validate_coordinates()` - coordinate tuples
 - `_validate_positive_int()` - numeric parameters
+- Pydantic models validate all field values automatically
 
 ### Deal Prioritization
 `find_recent_deals_for_address()` assigns priority levels:
@@ -227,8 +280,9 @@ See `TASKS.md` for complete implementation plan. Current status:
 - **Phase 2.2:** Market analysis tools (✅ complete)
 - **Phase 2.3:** Enhanced filtering (✅ complete)
 - **Phase 3:** Package refactoring (✅ complete - monolithic govmap.py refactored into modular package)
-- **Phase 4:** Pydantic data models (planned)
-- **Phase 5:** Expanded test coverage (ongoing)
+- **Phase 4.1:** Pydantic data models (✅ complete - **v2.0.0 released** with breaking changes)
+- **Phase 4.2:** Response summarization (📋 planned)
+- **Phase 5:** Expanded test coverage (⏳ in progress - core model tests complete)
 
 ## Common Tasks
 
@@ -277,14 +331,20 @@ The client uses these Govmap API endpoints:
 ## Important Notes for AI Agents
 
 - This project uses **FastMCP**, not the standard MCP library
+- **v2.0.0 Breaking Change:** All API methods now return **Pydantic models**, not dicts
+  - Use model attributes (e.g., `deal.deal_amount`) not dict access (e.g., `deal["dealAmount"]`)
+  - Field names are **snake_case** in Python (e.g., `deal_amount`, `asset_area`)
+  - Serialize with `.model_dump()` for JSON/dicts
+  - See `MIGRATION.md` for complete migration guide
 - All coordinate tuples are `(longitude, latitude)` in ITM projection (Israeli Transverse Mercator)
 - The `govmap` package is now modular - each module has a specific responsibility:
-  - `client.py` - API calls and HTTP logic
+  - `models.py` - **Pydantic v2 data models** (9 models with validation)
+  - `client.py` - API calls and HTTP logic (returns Pydantic models)
   - `validators.py` - Input validation
-  - `filters.py` - Deal filtering
-  - `statistics.py` - Statistical calculations
-  - `market_analysis.py` - Market analysis metrics
+  - `filters.py` - Deal filtering (accepts/returns models)
+  - `statistics.py` - Statistical calculations (returns models)
+  - `market_analysis.py` - Market analysis metrics (returns models)
   - `utils.py` - Helper utilities
 - Floor numbers in Hebrew (e.g., "קרקע", "מרתף") are parsed by `extract_floor_number()` in `utils.py`
 - Deal types: 1 = first hand/new construction, 2 = second hand/resale
-- Backward compatibility maintained: `from nadlan_mcp.govmap import GovmapClient` still works
+- Import compatibility maintained: `from nadlan_mcp.govmap import GovmapClient` still works

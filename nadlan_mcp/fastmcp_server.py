@@ -8,9 +8,10 @@ using the FastMCP library with simplified, working functions.
 
 import json
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from mcp.server.fastmcp import FastMCP
 from nadlan_mcp.govmap import GovmapClient
+from nadlan_mcp.govmap.models import Deal, AutocompleteResponse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -22,72 +23,73 @@ mcp = FastMCP("nadlan-mcp")
 # Initialize the Govmap client
 client = GovmapClient()
 
-def strip_bloat_fields(deals: List[Dict]) -> List[Dict]:
+def strip_bloat_fields(deals: List[Deal]) -> List[Dict[str, Any]]:
     """
-    Remove bloat fields from deal objects to reduce token usage in MCP responses.
+    Remove bloat fields from Deal models to reduce token usage in MCP responses.
 
-    Removes:
+    Converts Deal models to dictionaries and removes:
     - shape: Large MULTIPOLYGON coordinate data (~40-50% of tokens, not useful for LLM analysis)
     - sourceorder: Internal ordering field
-    - source_polygon_id: Internal reference field
+    - source_polygon_id: Internal reference field (only when it's a UUID string)
 
     Args:
-        deals: List of deal dictionaries
+        deals: List of Deal model instances
 
     Returns:
-        List of deals with bloat fields removed
+        List of deal dictionaries with bloat fields removed
     """
-    bloat_fields = {'shape', 'sourceorder', 'source_polygon_id'}
+    bloat_fields = {'shape', 'sourceorder'}
+    # Note: We keep source_polygon_id if it was added by our processing logic
 
-    return [
-        {k: v for k, v in deal.items() if k not in bloat_fields}
-        for deal in deals
-    ]
+    result = []
+    for deal in deals:
+        # Convert Deal model to dict, excluding None values for cleaner output
+        # Use mode='json' to serialize dates as ISO strings
+        deal_dict = deal.model_dump(mode='json', exclude_none=True)
+
+        # Remove bloat fields
+        filtered_dict = {k: v for k, v in deal_dict.items() if k not in bloat_fields}
+        result.append(filtered_dict)
+
+    return result
 
 @mcp.tool()
 def autocomplete_address(search_text: str) -> str:
     """Search and autocomplete Israeli addresses.
-    
+
     Args:
         search_text: The partial address to search for (in Hebrew or English)
-        
+
     Returns:
         JSON string containing matching addresses with their coordinates
     """
     try:
         response = client.autocomplete_address(search_text)
-        
-        if not response or 'results' not in response:
+
+        if not response.results:
             return f"No addresses found for '{search_text}'"
-        
+
         # Format results for better readability
         formatted_results = []
-        for result in response['results']:
-            # Parse coordinates from WKT POINT format: "POINT(longitude latitude)"
-            shape_str = result.get("shape", "")
-            coordinates = {}
-            if shape_str and shape_str.startswith("POINT("):
-                try:
-                    coords_str = shape_str[6:-1]  # Remove "POINT(" and ")"
-                    coords = coords_str.split()
-                    if len(coords) == 2:
-                        coordinates = {
-                            "longitude": float(coords[0]),
-                            "latitude": float(coords[1])
-                        }
-                except (ValueError, IndexError) as e:
-                    logger.warning(f"Failed to parse coordinates from shape: {shape_str}, error: {e}")
+        for result in response.results:
+            result_dict = {
+                "text": result.text,
+                "id": result.id,
+                "type": result.type,
+                "score": result.score,
+            }
 
-            formatted_results.append({
-                "text": result.get("text", ""),
-                "id": result.get("id", ""),
-                "type": result.get("type", ""),
-                "score": result.get("score", 0),
-                "coordinates": coordinates
-            })
+            # Add coordinates if available
+            if result.coordinates:
+                result_dict["coordinates"] = {
+                    "longitude": result.coordinates.longitude,
+                    "latitude": result.coordinates.latitude
+                }
+
+            formatted_results.append(result_dict)
 
         return json.dumps(formatted_results, ensure_ascii=False, indent=2)
-        
+
     except Exception as e:
         logger.error(f"Error in autocomplete_address: {e}")
         return f"Error searching for address: {str(e)}"
@@ -136,26 +138,19 @@ def get_street_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> s
     """
     try:
         deals = client.get_street_deals(polygon_id, limit, deal_type=deal_type)
-        
+
         if not deals:
             deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
             return f"No {deal_type_desc} deals found for polygon ID {polygon_id}"
-        
-        # Add price per sqm calculation for each deal
+
+        # Add deal type metadata
         for deal in deals:
-            price = deal.get('dealAmount', 0)
-            area = deal.get('assetArea', 0)
-            if isinstance(price, (int, float)) and isinstance(area, (int, float)) and area > 0:
-                deal['price_per_sqm'] = round(price / area, 2)
-            else:
-                deal['price_per_sqm'] = None
-            # Add deal type info
-            deal['deal_type'] = deal_type
-            deal['deal_type_description'] = 'first_hand_new' if deal_type == 1 else 'second_hand_used'
-        
-        # Calculate basic statistics including price per sqm
-        prices = [deal.get("dealAmount", 0) for deal in deals if deal.get("dealAmount")]
-        price_per_sqm_values = [deal.get("price_per_sqm", 0) for deal in deals if deal.get("price_per_sqm")]
+            deal.deal_type = deal_type
+            deal.deal_type_description = 'first_hand_new' if deal_type == 1 else 'second_hand_used'
+
+        # Calculate basic statistics using computed fields from models
+        prices = [deal.deal_amount for deal in deals if deal.deal_amount]
+        price_per_sqm_values = [deal.price_per_sqm for deal in deals if deal.price_per_sqm]
         
         stats = {}
         if price_per_sqm_values:
@@ -196,20 +191,21 @@ def find_recent_deals_for_address(address: str, years_back: int = 2, radius_mete
     """
     try:
         deals = client.find_recent_deals_for_address(address, years_back, radius_meters, max_deals, deal_type)
-        
+
         if not deals:
             deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
             return f"No {deal_type_desc} deals found for address '{address}'"
-        
-        # Calculate comprehensive statistics
-        prices = [deal.get("dealAmount", 0) for deal in deals if deal.get("dealAmount")]
-        areas = [deal.get("assetArea", 0) for deal in deals if deal.get("assetArea")]
-        price_per_sqm_values = [deal.get("price_per_sqm", 0) for deal in deals if deal.get("price_per_sqm")]
-        
+
+        # Calculate comprehensive statistics using model attributes
+        prices = [deal.deal_amount for deal in deals if deal.deal_amount]
+        areas = [deal.asset_area for deal in deals if deal.asset_area]
+        price_per_sqm_values = [deal.price_per_sqm for deal in deals if deal.price_per_sqm]
+
         # Separate building, street and neighborhood deals for analysis
-        building_deals = [deal for deal in deals if deal.get("deal_source") == "same_building"]
-        street_deals = [deal for deal in deals if deal.get("deal_source") == "street"]
-        neighborhood_deals = [deal for deal in deals if deal.get("deal_source") == "neighborhood"]
+        # deal_source is added dynamically in find_recent_deals_for_address
+        building_deals = [deal for deal in deals if getattr(deal, "deal_source", None) == "same_building"]
+        street_deals = [deal for deal in deals if getattr(deal, "deal_source", None) == "street"]
+        neighborhood_deals = [deal for deal in deals if getattr(deal, "deal_source", None) == "neighborhood"]
         
         stats = {
             "deal_breakdown": {
@@ -280,26 +276,19 @@ def get_neighborhood_deals(polygon_id: str, limit: int = 100, deal_type: int = 2
     """
     try:
         deals = client.get_neighborhood_deals(polygon_id, limit, deal_type=deal_type)
-        
+
         if not deals:
             deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
             return f"No {deal_type_desc} deals found for polygon ID {polygon_id}"
-        
-        # Add price per sqm calculation for each deal
+
+        # Add deal type metadata
         for deal in deals:
-            price = deal.get('dealAmount', 0)
-            area = deal.get('assetArea', 0)
-            if isinstance(price, (int, float)) and isinstance(area, (int, float)) and area > 0:
-                deal['price_per_sqm'] = round(price / area, 2)
-            else:
-                deal['price_per_sqm'] = None
-            # Add deal type info
-            deal['deal_type'] = deal_type
-            deal['deal_type_description'] = 'first_hand_new' if deal_type == 1 else 'second_hand_used'
-        
-        # Calculate basic statistics including price per sqm
-        prices = [deal.get("dealAmount", 0) for deal in deals if deal.get("dealAmount")]
-        price_per_sqm_values = [deal.get("price_per_sqm", 0) for deal in deals if deal.get("price_per_sqm")]
+            deal.deal_type = deal_type
+            deal.deal_type_description = 'first_hand_new' if deal_type == 1 else 'second_hand_used'
+
+        # Calculate basic statistics using computed fields from models
+        prices = [deal.deal_amount for deal in deals if deal.deal_amount]
+        price_per_sqm_values = [deal.price_per_sqm for deal in deals if deal.price_per_sqm]
         
         stats = {}
         if price_per_sqm_values:
@@ -354,17 +343,19 @@ def analyze_market_trends(address: str, years_back: int = 3, radius_meters: int 
         
         # Simplified processing - extract only essential data
         for deal in deals:
-            date_str = deal.get('dealDate', '')
-            if not date_str:
+            if not deal.deal_date:
                 continue
-                
+
+            # Convert date to string for parsing
+            from datetime import date as date_type
+            date_str = deal.deal_date.isoformat() if isinstance(deal.deal_date, date_type) else str(deal.deal_date)
             year = date_str[:4]
-            price = deal.get('dealAmount')
-            area = deal.get('assetArea')
-            price_per_sqm = deal.get('price_per_sqm')
-            prop_type = deal.get('assetTypeHeb', deal.get('propertyTypeDescription', 'לא ידוע'))
-            neighborhood = deal.get('settlementNameHeb', deal.get('neighborhood', 'לא ידוע'))
-            deal_source = deal.get('deal_source', 'unknown')
+            price = deal.deal_amount
+            area = deal.asset_area
+            price_per_sqm = deal.price_per_sqm
+            prop_type = deal.property_type_description or 'לא ידוע'
+            neighborhood = deal.settlement_name_heb or deal.neighborhood or 'לא ידוע'
+            deal_source = getattr(deal, 'deal_source', 'unknown')
             
             if isinstance(price, (int, float)) and isinstance(area, (int, float)) and area > 0 and isinstance(price_per_sqm, (int, float)):
                 yearly_data[year].append({
@@ -462,7 +453,7 @@ def analyze_market_trends(address: str, years_back: int = 3, radius_meters: int 
             "key_insights": {
                 "most_active_year": max(yearly_trends.keys(), key=lambda y: yearly_trends[y]['deal_count']) if yearly_trends else None,
                 "highest_avg_price_year": max(yearly_trends.keys(), key=lambda y: yearly_trends[y]['avg_price_per_sqm']) if yearly_trends else None,
-                "deal_source_summary": f"Building: {len([d for d in deals if d.get('deal_source') == 'same_building'])}, Street: {len([d for d in deals if d.get('deal_source') == 'street'])}, Neighborhood: {len([d for d in deals if d.get('deal_source') == 'neighborhood'])}"
+                "deal_source_summary": f"Building: {len([d for d in deals if getattr(d, 'deal_source', None) == 'same_building'])}, Street: {len([d for d in deals if getattr(d, 'deal_source', None) == 'street'])}, Neighborhood: {len([d for d in deals if getattr(d, 'deal_source', None) == 'neighborhood'])}"
             }
         }, ensure_ascii=False, indent=2)
         
@@ -488,12 +479,12 @@ def compare_addresses(addresses: List[str]) -> str:
                 deals = client.find_recent_deals_for_address(address, 2)
                 
                 if deals:
-                    prices = [deal.get("dealAmount", 0) for deal in deals if deal.get("dealAmount")]
-                    areas = [deal.get("assetArea", 0) for deal in deals if deal.get("assetArea")]
-                    price_per_sqm_values = [deal.get("price_per_sqm", 0) for deal in deals if deal.get("price_per_sqm")]
-                    building_deals = [deal for deal in deals if deal.get("deal_source") == "same_building"]
-                    street_deals = [deal for deal in deals if deal.get("deal_source") == "street"]
-                    neighborhood_deals = [deal for deal in deals if deal.get("deal_source") == "neighborhood"]
+                    prices = [deal.deal_amount for deal in deals if deal.deal_amount]
+                    areas = [deal.asset_area for deal in deals if deal.asset_area]
+                    price_per_sqm_values = [deal.price_per_sqm for deal in deals if deal.price_per_sqm]
+                    building_deals = [deal for deal in deals if getattr(deal, "deal_source", None) == "same_building"]
+                    street_deals = [deal for deal in deals if getattr(deal, "deal_source", None) == "street"]
+                    neighborhood_deals = [deal for deal in deals if getattr(deal, "deal_source", None) == "neighborhood"]
                     
                     comparison = {
                         "address": address,
@@ -644,7 +635,7 @@ def get_valuation_comparables(
         
         # Calculate statistics on filtered comparables
         stats = client.calculate_deal_statistics(filtered_deals)
-        
+
         return json.dumps({
             "address": address,
             "years_back": years_back,
@@ -656,7 +647,7 @@ def get_valuation_comparables(
                 "floor": f"{min_floor}-{max_floor}" if min_floor or max_floor else None,
             },
             "total_comparables": len(filtered_deals),
-            "statistics": stats,
+            "statistics": stats.model_dump(exclude_none=True),  # Serialize DealStatistics model
             "comparables": strip_bloat_fields(filtered_deals)
         }, ensure_ascii=False, indent=2)
 
@@ -712,7 +703,7 @@ def get_deal_statistics(
         
         # Calculate statistics
         stats = client.calculate_deal_statistics(deals)
-        
+
         return json.dumps({
             "address": address,
             "years_back": years_back,
@@ -720,7 +711,7 @@ def get_deal_statistics(
                 "property_type": property_type,
                 "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
             },
-            "statistics": stats
+            "statistics": stats.model_dump(exclude_none=True)  # Serialize DealStatistics model
         }, ensure_ascii=False, indent=2)
         
     except Exception as e:
@@ -737,13 +728,18 @@ def _safe_calculate_metric(metric_func, deals):
 
     Args:
         metric_func: Function to call with deals as argument
-        deals: List of deal dictionaries to analyze
+        deals: List of Deal model instances to analyze
 
     Returns:
-        Result dictionary from metric_func, or error dictionary if ValueError raised
+        Result dictionary from metric_func (serialized from Pydantic model),
+        or error dictionary if ValueError raised
     """
     try:
-        return metric_func(deals)
+        result = metric_func(deals)
+        # Serialize Pydantic model to dict
+        if hasattr(result, 'model_dump'):
+            return result.model_dump(exclude_none=True)
+        return result
     except ValueError as e:
         return {"error": str(e)}
 
@@ -799,8 +795,10 @@ def get_market_activity_metrics(
             "market_liquidity": liquidity_metrics,
             "investment_potential": investment_metrics,
             "summary": {
-                "activity_level": activity_metrics.get("activity_level"),
-                "liquidity_rating": liquidity_metrics.get("liquidity_rating"),
+                "activity_score": activity_metrics.get("activity_score"),
+                "activity_trend": activity_metrics.get("trend"),
+                "liquidity_score": liquidity_metrics.get("liquidity_score"),
+                "market_activity_level": liquidity_metrics.get("market_activity_level"),
                 "investment_score": investment_metrics.get("investment_score"),
                 "price_trend": investment_metrics.get("price_trend"),
                 "market_stability": investment_metrics.get("market_stability")

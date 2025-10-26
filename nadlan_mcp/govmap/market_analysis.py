@@ -7,9 +7,10 @@ Focused on providing data metrics; the LLM interprets them for investment advice
 
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import date, datetime, timedelta
+from typing import Dict, List, Optional, Tuple
 
+from .models import Deal, MarketActivityScore, InvestmentAnalysis, LiquidityMetrics
 from .statistics import calculate_std_dev
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ LIQUIDITY_LOW_THRESHOLD = 0.5
 
 
 def parse_deal_dates(
-    deals: List[Dict[str, Any]], time_period_months: Optional[int] = None
+    deals: List[Deal], time_period_months: Optional[int] = None
 ) -> Tuple[List[str], Dict[str, int], Dict[str, int]]:
     """
     Parse and filter deal dates from a list of deals.
@@ -44,7 +45,7 @@ def parse_deal_dates(
     time period if specified, and groups deals by month and quarter.
 
     Args:
-        deals: List of deal dictionaries with 'dealDate' field
+        deals: List of Deal model instances
         time_period_months: Optional time period to filter (from today backwards)
 
     Returns:
@@ -67,11 +68,13 @@ def parse_deal_dates(
     deal_dates = []
 
     for deal in deals:
-        date_str = deal.get("dealDate", "")
-        if not date_str:
+        if not deal.deal_date:
             continue
 
         try:
+            # Convert date to string for comparison and parsing
+            date_str = deal.deal_date.isoformat() if isinstance(deal.deal_date, date) else str(deal.deal_date)
+
             # Filter by time period if specified
             if cutoff_date is not None and date_str < cutoff_date_str:
                 continue
@@ -99,8 +102,8 @@ def parse_deal_dates(
 
 
 def calculate_market_activity_score(
-    deals: List[Dict[str, Any]], time_period_months: int = 12
-) -> Dict[str, Any]:
+    deals: List[Deal], time_period_months: Optional[int] = 12
+) -> MarketActivityScore:
     """
     Calculate market activity and liquidity metrics.
 
@@ -108,17 +111,16 @@ def calculate_market_activity_score(
     to provide a comprehensive view of market liquidity.
 
     Args:
-        deals: List of deal dictionaries
+        deals: List of Deal model instances
         time_period_months: Time period to analyze in months (default: 12)
 
     Returns:
-        Dictionary containing:
+        MarketActivityScore model with:
             - total_deals: Total number of deals
             - deals_per_month: Average deals per month
             - activity_score: Market activity score (0-100)
             - trend: Activity trend ('increasing', 'stable', 'decreasing')
             - monthly_distribution: Deals per month breakdown
-            - activity_level: Description ('very_high', 'high', 'moderate', 'low', 'very_low')
 
     Raises:
         ValueError: If deals list is empty or invalid
@@ -138,19 +140,14 @@ def calculate_market_activity_score(
     # Based on deals per month using defined thresholds
     if deals_per_month >= ACTIVITY_VERY_HIGH_THRESHOLD:
         activity_score = 100
-        activity_level = "very_high"
     elif deals_per_month >= ACTIVITY_HIGH_THRESHOLD:
         activity_score = 75 + ((deals_per_month - ACTIVITY_HIGH_THRESHOLD) / ACTIVITY_HIGH_THRESHOLD) * 25
-        activity_level = "high"
     elif deals_per_month >= ACTIVITY_MODERATE_THRESHOLD:
         activity_score = 50 + ((deals_per_month - ACTIVITY_MODERATE_THRESHOLD) / (ACTIVITY_HIGH_THRESHOLD - ACTIVITY_MODERATE_THRESHOLD)) * 25
-        activity_level = "moderate"
     elif deals_per_month >= ACTIVITY_LOW_THRESHOLD:
         activity_score = 25 + ((deals_per_month - ACTIVITY_LOW_THRESHOLD) / (ACTIVITY_MODERATE_THRESHOLD - ACTIVITY_LOW_THRESHOLD)) * 25
-        activity_level = "low"
     else:
         activity_score = deals_per_month * 25
-        activity_level = "very_low"
 
     # Calculate trend (compare first half vs second half)
     sorted_months = sorted(monthly_deals.keys())
@@ -172,18 +169,17 @@ def calculate_market_activity_score(
     else:
         trend = "insufficient_data"
 
-    return {
-        "total_deals": total_deals,
-        "unique_months": unique_months,
-        "deals_per_month": round(deals_per_month, 2),
-        "activity_score": round(activity_score, 1),
-        "activity_level": activity_level,
-        "trend": trend,
-        "monthly_distribution": dict(sorted(monthly_deals.items())),
-    }
+    return MarketActivityScore(
+        activity_score=round(activity_score, 1),
+        total_deals=total_deals,
+        deals_per_month=round(deals_per_month, 2),
+        trend=trend,
+        time_period_months=time_period_months,
+        monthly_distribution=dict(sorted(monthly_deals.items())),
+    )
 
 
-def analyze_investment_potential(deals: List[Dict[str, Any]]) -> Dict[str, Any]:
+def analyze_investment_potential(deals: List[Deal]) -> InvestmentAnalysis:
     """
     Analyze investment potential based on price trends and market stability.
 
@@ -192,10 +188,10 @@ def analyze_investment_potential(deals: List[Dict[str, Any]]) -> Dict[str, Any]:
     data metrics; the LLM interprets them for investment advice.
 
     Args:
-        deals: List of deal dictionaries with price and date information
+        deals: List of Deal model instances with price and date information
 
     Returns:
-        Dictionary containing:
+        InvestmentAnalysis model containing:
             - price_appreciation_rate: Annual price growth rate (%)
             - price_volatility: Price volatility score (0-100, lower is more stable)
             - market_stability: Stability rating ('very_stable', 'stable', 'moderate', 'volatile', 'very_volatile')
@@ -214,11 +210,13 @@ def analyze_investment_potential(deals: List[Dict[str, Any]]) -> Dict[str, Any]:
     # Extract price per sqm and dates
     price_data = []
     for deal in deals:
-        price_per_sqm = deal.get("price_per_sqm")
-        date_str = deal.get("dealDate", "")
+        price_per_sqm = deal.price_per_sqm  # Use computed field from Deal model
 
-        if isinstance(price_per_sqm, (int, float)) and price_per_sqm > 0 and date_str:
+        if price_per_sqm and price_per_sqm > 0 and deal.deal_date:
             try:
+                # Convert date to string for parsing
+                date_str = deal.deal_date.isoformat() if isinstance(deal.deal_date, date) else str(deal.deal_date)
+
                 # Parse date for sorting
                 year = int(date_str[:4])
                 month = int(date_str[5:7])
@@ -311,22 +309,22 @@ def analyze_investment_potential(deals: List[Dict[str, Any]]) -> Dict[str, Any]:
     else:
         data_quality = "limited"
 
-    return {
-        "price_appreciation_rate": round(price_appreciation_rate, 2),
-        "price_volatility": round(volatility_score, 1),
-        "market_stability": market_stability,
-        "price_trend": price_trend,
-        "avg_price_per_sqm": round(avg_price_per_sqm, 0),
-        "price_change_pct": round(price_change_pct, 2),
-        "investment_score": round(investment_score, 1),
-        "data_quality": data_quality,
-        "sample_size": n,
-    }
+    return InvestmentAnalysis(
+        investment_score=round(investment_score, 1),
+        price_trend=price_trend,
+        price_appreciation_rate=round(price_appreciation_rate, 2),
+        price_volatility=round(volatility_score, 1),
+        market_stability=market_stability,
+        avg_price_per_sqm=round(avg_price_per_sqm, 0),
+        price_change_pct=round(price_change_pct, 2),
+        total_deals=n,
+        data_quality=data_quality,
+    )
 
 
 def get_market_liquidity(
-    deals: List[Dict[str, Any]], time_period_months: int = 12
-) -> Dict[str, Any]:
+    deals: List[Deal], time_period_months: Optional[int] = 12
+) -> LiquidityMetrics:
     """
     Get detailed market liquidity and turnover metrics.
 
@@ -400,23 +398,11 @@ def get_market_liquidity(
     else:
         trend_direction = "insufficient_data"
 
-    # Find most active period
-    if quarterly_deals:
-        most_active_quarter = max(quarterly_deals.items(), key=lambda x: x[1])
-        most_active_period = f"{most_active_quarter[0]} ({most_active_quarter[1]} deals)"
-    else:
-        most_active_period = "N/A"
-
-    return {
-        "total_deals": total_deals,
-        "unique_months": unique_months,
-        "unique_quarters": unique_quarters,
-        "deals_per_month": round(deals_per_month, 2),
-        "deals_per_quarter": round(deals_per_quarter, 2),
-        "quarterly_breakdown": dict(sorted(quarterly_deals.items())),
-        "monthly_breakdown": dict(sorted(monthly_deals.items())),
-        "velocity_score": round(velocity_score, 1),
-        "liquidity_rating": liquidity_rating,
-        "trend_direction": trend_direction,
-        "most_active_period": most_active_period,
-    }
+    return LiquidityMetrics(
+        liquidity_score=round(velocity_score, 1),
+        total_deals=total_deals,
+        time_period_months=time_period_months,
+        avg_deals_per_month=round(deals_per_month, 2),
+        deal_velocity=round(deals_per_month, 2),
+        market_activity_level=liquidity_rating,
+    )
