@@ -6,7 +6,7 @@ Israeli real estate MCP system. Models provide validation, serialization,
 and type safety throughout the codebase.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator, computed_field, ConfigDict
 
@@ -105,7 +105,7 @@ class Deal(BaseModel):
     # Required fields
     objectid: int = Field(..., description="Unique deal identifier")
     deal_amount: float = Field(..., alias="dealAmount", description="Transaction amount in NIS")
-    deal_date: str = Field(..., alias="dealDate", description="Transaction date (ISO format)")
+    deal_date: date = Field(..., alias="dealDate", description="Transaction date")
 
     # Common optional fields
     asset_area: Optional[float] = Field(None, alias="assetArea", description="Property area in sqm")
@@ -150,13 +150,21 @@ class Deal(BaseModel):
 
     @field_validator('deal_date', mode='before')
     @classmethod
-    def parse_deal_date(cls, v: Any) -> str:
-        """Parse deal date to ISO format string."""
-        if isinstance(v, str):
+    def parse_deal_date(cls, v: Any) -> date:
+        """Parse deal date string into a date object."""
+        if isinstance(v, date):
             return v
         if isinstance(v, datetime):
-            return v.isoformat()
-        return str(v)
+            return v.date()
+        if isinstance(v, str):
+            # Handle ISO format with optional time and timezone
+            if 'T' in v:
+                v = v.split('T')[0]
+            try:
+                return date.fromisoformat(v)
+            except ValueError:
+                raise ValueError(f"Invalid date format: {v}")
+        raise TypeError(f"Unsupported type for date parsing: {type(v)}")
 
 
 class DealStatistics(BaseModel):

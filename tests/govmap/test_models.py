@@ -425,23 +425,35 @@ class TestDealFilters:
 class TestModelIntegration:
     """Integration tests for models working together."""
 
-    def test_deal_to_statistics_workflow(self):
-        """Test creating deals and calculating statistics."""
-        deals = [
-            Deal(
-                objectid=i,
-                deal_amount=1500000.0 + (i * 10000),
-                deal_date=f"2024-01-{i+1:02d}",
-                asset_area=80.0 + i,
-                property_type_description="דירה"
-            )
-            for i in range(10)
-        ]
+    def test_deal_to_statistics_workflow(self):  
+        """Test creating deals and calculating statistics."""  
+        # Import the function to test integration  
+        from nadlan_mcp.govmap.statistics import calculate_deal_statistics  
 
-        # Verify all deals have price_per_sqm
-        for deal in deals:
-            assert deal.price_per_sqm is not None
-            assert deal.price_per_sqm > 0
+        deals = [  
+            Deal(  
+                objectid=1,  
+                deal_amount=1000000.0,  
+                deal_date="2024-01-01",  
+                asset_area=100.0,  
+                property_type_description="דירה"  
+            ),  
+            Deal(  
+                objectid=2,  
+                deal_amount=2000000.0,  
+                deal_date="2024-01-02",  
+                asset_area=100.0,  
+                property_type_description="דירה"  
+            ),  
+        ]  
+
+        stats = calculate_deal_statistics(deals)  
+
+        assert isinstance(stats, DealStatistics)  
+        assert stats.total_deals == 2  
+        assert stats.price_statistics["mean"] == 1500000.0  
+        assert stats.price_per_sqm_statistics["mean"] == 15000.0  
+        assert stats.property_type_distribution["דירה"] == 2 
 
     def test_autocomplete_to_deals_workflow(self):
         """Test autocomplete response leading to deal search."""

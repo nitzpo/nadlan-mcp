@@ -6,9 +6,12 @@ This module provides pure mathematical functions for analyzing real estate deal 
 
 from collections import Counter
 from typing import List
-from datetime import datetime
+import logging
+from datetime import date
 
 from .models import Deal, DealStatistics
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_deal_statistics(deals: List[Deal]) -> DealStatistics:
@@ -127,6 +130,7 @@ def calculate_deal_statistics(deals: List[Deal]) -> DealStatistics:
                         date_str = date_str.split('T')[0]
                     parsed_dates.append(date_str)
                 except (ValueError, TypeError):
+                    logger.warning(f"Invalid date format: {date_str}")
                     continue
 
             if parsed_dates:
@@ -135,7 +139,8 @@ def calculate_deal_statistics(deals: List[Deal]) -> DealStatistics:
                     "earliest": sorted_dates[0],
                     "latest": sorted_dates[-1],
                 }
-        except:
+        except (ValueError, TypeError):
+            logger.warning("Invalid date format: {date_range_dict}")
             pass
 
     return DealStatistics(
