@@ -5,13 +5,28 @@ This package provides a modular interface to the Govmap API for querying
 Israeli real estate deals, market trends, and property information.
 
 Public API:
-    - GovmapClient: Main API client class (to be added from client.py)
+    - GovmapClient: Main API client class
+    - Pydantic models for type-safe data structures
     - filter_deals_by_criteria: Filter deals by various criteria
     - calculate_deal_statistics: Calculate statistical aggregations
     - calculate_market_activity_score: Market activity and trend metrics
     - analyze_investment_potential: Investment analysis and price trends
     - get_market_liquidity: Market liquidity and velocity metrics
 """
+
+# Pydantic models
+from .models import (
+    CoordinatePoint,
+    Address,
+    AutocompleteResult,
+    AutocompleteResponse,
+    Deal,
+    DealStatistics,
+    MarketActivityScore,
+    InvestmentAnalysis,
+    LiquidityMetrics,
+    DealFilters,
+)
 
 # Filter functions
 from .filters import filter_deals_by_criteria
@@ -44,6 +59,17 @@ from .client import GovmapClient
 __all__ = [
     # Main client class
     "GovmapClient",
+    # Pydantic models
+    "CoordinatePoint",
+    "Address",
+    "AutocompleteResult",
+    "AutocompleteResponse",
+    "Deal",
+    "DealStatistics",
+    "MarketActivityScore",
+    "InvestmentAnalysis",
+    "LiquidityMetrics",
+    "DealFilters",
     # Filtering
     "filter_deals_by_criteria",
     # Statistics

@@ -1,11 +1,14 @@
 """
 Tests for the GovmapClient class.
+
+Updated for Phase 4.1 - Pydantic models integration.
 """
 
 import pytest
 import requests
 from unittest.mock import Mock, patch
 from nadlan_mcp.govmap import GovmapClient
+from nadlan_mcp.govmap.models import Deal, AutocompleteResponse, AutocompleteResult
 from nadlan_mcp.config import GovmapConfig
 
 
@@ -46,17 +49,21 @@ class TestGovmapClient:
             ]
         }
         mock_response.raise_for_status.return_value = None
-        
+
         mock_session = Mock()
         mock_session.post.return_value = mock_response
         mock_session_class.return_value = mock_session
-        
+
         client = GovmapClient()
         result = client.autocomplete_address("תל אביב")
-        
-        assert result["resultsCount"] == 1
-        assert len(result["results"]) == 1
-        assert result["results"][0]["text"] == "תל אביב"
+
+        # Now returns AutocompleteResponse model
+        assert isinstance(result, AutocompleteResponse)
+        assert result.results_count == 1
+        assert len(result.results) == 1
+        assert result.results[0].text == "תל אביב"
+        assert result.results[0].coordinates is not None
+        assert result.results[0].coordinates.longitude == 3870000.123
         mock_session.post.assert_called_once()
     
     @patch('requests.Session')
@@ -65,16 +72,17 @@ class TestGovmapClient:
         mock_response = Mock()
         mock_response.json.return_value = {"resultsCount": 0, "results": []}
         mock_response.raise_for_status.return_value = None
-        
+
         mock_session = Mock()
         mock_session.post.return_value = mock_response
         mock_session_class.return_value = mock_session
-        
+
         client = GovmapClient()
         result = client.autocomplete_address("nonexistent")
-        
-        assert result["resultsCount"] == 0
-        assert len(result["results"]) == 0
+
+        assert isinstance(result, AutocompleteResponse)
+        assert result.results_count == 0
+        assert len(result.results) == 0
     
     @patch('requests.Session')
     def test_autocomplete_address_invalid_response(self, mock_session_class):
@@ -120,23 +128,27 @@ class TestGovmapClient:
         mock_response = Mock()
         mock_response.json.return_value = [
             {
-                "dealscount": "2",
+                "objectid": 12345,
+                "dealAmount": 1500000.0,
+                "dealDate": "2024-01-15",
                 "settlementNameHeb": "תל אביב-יפו",
-                "polygon_id": "123-456",
-                "objectid": 12345
+                "polygon_id": "123-456"
             }
         ]
         mock_response.raise_for_status.return_value = None
-        
+
         mock_session = Mock()
         mock_session.get.return_value = mock_response
         mock_session_class.return_value = mock_session
-        
+
         client = GovmapClient()
         result = client.get_deals_by_radius((3870000.123, 3770000.456), radius=50)
-        
+
+        # Now returns List[Deal]
         assert len(result) == 1
-        assert result[0]["polygon_id"] == "123-456"
+        assert isinstance(result[0], Deal)
+        assert result[0].objectid == 12345
+        assert result[0].settlement_name_heb == "תל אביב-יפו"
         mock_session.get.assert_called_once()
     
     @patch('requests.Session')
@@ -164,10 +176,13 @@ class TestGovmapClient:
         
         client = GovmapClient()
         result = client.get_street_deals("123-456")
-        
+
+        # Now returns List[Deal]
         assert len(result) == 1
-        assert result[0]["dealAmount"] == 1000000
-        assert result[0]["assetArea"] == 100
+        assert isinstance(result[0], Deal)
+        assert result[0].deal_amount == 1000000
+        assert result[0].asset_area == 100
+        assert result[0].price_per_sqm == 10000.0  # Computed field
         mock_session.get.assert_called_once()
     
     @patch('requests.Session')
@@ -195,10 +210,13 @@ class TestGovmapClient:
         
         client = GovmapClient()
         result = client.get_neighborhood_deals("123-456")
-        
+
+        # Now returns List[Deal]
         assert len(result) == 1
-        assert result[0]["dealAmount"] == 2000000
-        assert result[0]["assetArea"] == 120
+        assert isinstance(result[0], Deal)
+        assert result[0].deal_amount == 2000000
+        assert result[0].asset_area == 120
+        assert result[0].price_per_sqm == round(2000000 / 120, 2)
         mock_session.get.assert_called_once()
     
     @patch('nadlan_mcp.main.GovmapClient.get_neighborhood_deals')

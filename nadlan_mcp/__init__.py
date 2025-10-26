@@ -6,6 +6,31 @@ public real estate data API (Govmap).
 """
 
 from .govmap import GovmapClient
+from .govmap.models import (
+    CoordinatePoint,
+    Address,
+    AutocompleteResult,
+    AutocompleteResponse,
+    Deal,
+    DealStatistics,
+    MarketActivityScore,
+    InvestmentAnalysis,
+    LiquidityMetrics,
+    DealFilters,
+)
 
-__version__ = "1.0.0"
-__all__ = ["GovmapClient"] 
+__version__ = "2.0.0"  # Breaking change: Pydantic models integration (Phase 4.1)
+__all__ = [
+    "GovmapClient",
+    # Pydantic models
+    "CoordinatePoint",
+    "Address",
+    "AutocompleteResult",
+    "AutocompleteResponse",
+    "Deal",
+    "DealStatistics",
+    "MarketActivityScore",
+    "InvestmentAnalysis",
+    "LiquidityMetrics",
+    "DealFilters",
+] 

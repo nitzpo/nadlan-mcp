@@ -15,6 +15,18 @@ import requests
 
 from nadlan_mcp.config import GovmapConfig, get_config
 
+# Import models
+from .models import (
+    Deal,
+    AutocompleteResponse,
+    AutocompleteResult,
+    CoordinatePoint,
+    DealStatistics,
+    MarketActivityScore,
+    InvestmentAnalysis,
+    LiquidityMetrics,
+)
+
 # Import functions from modular package
 from . import validators
 from . import utils
@@ -96,7 +108,7 @@ class GovmapClient:
         return utils.extract_floor_number(floor_str)
 
     # Core API methods
-    def autocomplete_address(self, search_text: str) -> Dict[str, Any]:
+    def autocomplete_address(self, search_text: str) -> AutocompleteResponse:
         """
         Find the most likely match for a given address using autocomplete.
 
@@ -104,7 +116,7 @@ class GovmapClient:
             search_text: The address to search for (e.g., "סוקולוב 38 חולון")
 
         Returns:
-            Dict containing the JSON response from the API with coordinates
+            AutocompleteResponse model with results and coordinates
 
         Raises:
             requests.RequestException: If the API request fails after retries
@@ -136,7 +148,37 @@ class GovmapClient:
                 if not data or "results" not in data:
                     raise ValueError("Invalid response format from autocomplete API")
 
-                return data
+                # Parse results into AutocompleteResult models
+                results = []
+                for result in data.get("results", []):
+                    # Parse coordinates from WKT POINT format if available
+                    coordinates = None
+                    shape_str = result.get("shape", "")
+                    if shape_str and shape_str.startswith("POINT("):
+                        try:
+                            coords_str = shape_str[6:-1]  # Remove "POINT(" and ")"
+                            coords = coords_str.split()
+                            if len(coords) == 2:
+                                coordinates = CoordinatePoint(
+                                    longitude=float(coords[0]),
+                                    latitude=float(coords[1])
+                                )
+                        except (ValueError, IndexError) as e:
+                            logger.warning(f"Failed to parse coordinates from shape: {shape_str}, error: {e}")
+
+                    results.append(AutocompleteResult(
+                        text=result.get("text", ""),
+                        id=result.get("id", ""),
+                        type=result.get("type", ""),
+                        score=result.get("score", 0),
+                        coordinates=coordinates,
+                        shape=shape_str if shape_str else None,
+                    ))
+
+                return AutocompleteResponse(
+                    resultsCount=data.get("resultsCount", len(results)),
+                    results=results
+                )
 
             except (requests.RequestException, requests.Timeout) as e:
                 if attempt < self.config.max_retries:
@@ -214,7 +256,7 @@ class GovmapClient:
 
     def get_deals_by_radius(
         self, point: Tuple[float, float], radius: int = 50
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Deal]:
         """
         Find real estate deals within a specified radius of a point.
 
@@ -223,7 +265,7 @@ class GovmapClient:
             radius: The search radius in meters (default: 50)
 
         Returns:
-            List of deals found within the radius
+            List of Deal models found within the radius
 
         Raises:
             requests.RequestException: If the API request fails after retries
@@ -250,7 +292,18 @@ class GovmapClient:
                     raise ValueError(
                         f"Expected list response, got {type(data).__name__}"
                     )
-                return data
+
+                # Parse each deal dict into Deal model
+                deals = []
+                for deal_dict in data:
+                    try:
+                        deal = Deal.model_validate(deal_dict)
+                        deals.append(deal)
+                    except Exception as e:
+                        logger.warning(f"Failed to parse deal: {e}. Skipping deal.")
+                        continue
+
+                return deals
 
             except (requests.RequestException, requests.Timeout) as e:
                 if attempt < self.config.max_retries:
@@ -279,7 +332,7 @@ class GovmapClient:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         deal_type: int = 2,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Deal]:
         """
         Retrieve detailed information about deals on a specific street.
 
@@ -291,7 +344,7 @@ class GovmapClient:
             deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
 
         Returns:
-            List of detailed deal information for the street
+            List of Deal models for the street
 
         Raises:
             requests.RequestException: If the API request fails after retries
@@ -308,7 +361,7 @@ class GovmapClient:
 
         url = f"{self.base_url}/real-estate/street-deals/{polygon_id}"
 
-        params: Dict[str, Any] = {"limit": limit, "dealType": deal_type}
+        params = {"limit": limit, "dealType": deal_type}
         if start_date:
             params["startDate"] = start_date
         if end_date:
@@ -328,18 +381,31 @@ class GovmapClient:
 
                 data = response.json()
                 # API returns {data: [...], totalCount: ..., limit: ..., offset: ...}
+                deal_dicts = []
                 if isinstance(data, dict) and "data" in data:
                     if not isinstance(data["data"], list):
                         raise ValueError(
                             f"Expected list in 'data' field, got {type(data['data']).__name__}"
                         )
-                    return data["data"]
+                    deal_dicts = data["data"]
                 elif isinstance(data, list):
-                    return data
+                    deal_dicts = data
                 else:
                     raise ValueError(
                         f"Unexpected response format: {type(data).__name__}"
                     )
+
+                # Parse each deal dict into Deal model
+                deals = []
+                for deal_dict in deal_dicts:
+                    try:
+                        deal = Deal.model_validate(deal_dict)
+                        deals.append(deal)
+                    except Exception as e:
+                        logger.warning(f"Failed to parse deal: {e}. Skipping deal.")
+                        continue
+
+                return deals
 
             except (requests.RequestException, requests.Timeout) as e:
                 if attempt < self.config.max_retries:
@@ -368,7 +434,7 @@ class GovmapClient:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         deal_type: int = 2,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Deal]:
         """
         Retrieve deals within the same neighborhood as the given polygon_id.
 
@@ -380,7 +446,7 @@ class GovmapClient:
             deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
 
         Returns:
-            List of deals in the neighborhood
+            List of Deal models in the neighborhood
 
         Raises:
             requests.RequestException: If the API request fails after retries
@@ -397,7 +463,7 @@ class GovmapClient:
 
         url = f"{self.base_url}/real-estate/neighborhood-deals/{polygon_id}"
 
-        params: Dict[str, Any] = {"limit": limit, "dealType": deal_type}
+        params = {"limit": limit, "dealType": deal_type}
         if start_date:
             params["startDate"] = start_date
         if end_date:
@@ -417,18 +483,31 @@ class GovmapClient:
 
                 data = response.json()
                 # API returns {data: [...], totalCount: ..., limit: ..., offset: ...}
+                deal_dicts = []
                 if isinstance(data, dict) and "data" in data:
                     if not isinstance(data["data"], list):
                         raise ValueError(
                             f"Expected list in 'data' field, got {type(data['data']).__name__}"
                         )
-                    return data["data"]
+                    deal_dicts = data["data"]
                 elif isinstance(data, list):
-                    return data
+                    deal_dicts = data
                 else:
                     raise ValueError(
                         f"Unexpected response format: {type(data).__name__}"
                     )
+
+                # Parse each deal dict into Deal model
+                deals = []
+                for deal_dict in deal_dicts:
+                    try:
+                        deal = Deal.model_validate(deal_dict)
+                        deals.append(deal)
+                    except Exception as e:
+                        logger.warning(f"Failed to parse deal: {e}. Skipping deal.")
+                        continue
+
+                return deals
 
             except (requests.RequestException, requests.Timeout) as e:
                 if attempt < self.config.max_retries:
@@ -457,7 +536,7 @@ class GovmapClient:
         radius: int = 30,
         max_deals: int = 100,
         deal_type: int = 2,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Deal]:
         """
         Find all relevant real estate deals for a given address from the last few years.
 
@@ -473,7 +552,7 @@ class GovmapClient:
             deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
 
         Returns:
-            List of deals found for the address area, with same building deals prioritized first,
+            List of Deal models found for the address area, with same building deals prioritized first,
             then street deals, then neighborhood deals
 
         Raises:
@@ -494,27 +573,16 @@ class GovmapClient:
             )
             autocomplete_result = self.autocomplete_address(address)
 
-            if not autocomplete_result.get("results"):
+            if not autocomplete_result.results:
                 raise ValueError(f"No results found for address: {address}")
 
             # Get the best match (first result)
-            best_match = autocomplete_result["results"][0]
-            if "shape" not in best_match:
+            best_match = autocomplete_result.results[0]
+            if not best_match.coordinates:
                 raise ValueError("No coordinates found in autocomplete result")
 
-            # Parse coordinates from WKT POINT string
-            # Format: "POINT(longitude latitude)"
-            shape_str = best_match["shape"]
-            if not shape_str.startswith("POINT("):
-                raise ValueError("Invalid coordinate format in autocomplete result")
-
-            # Extract coordinates from "POINT(x y)"
-            coords_str = shape_str[6:-1]  # Remove "POINT(" and ")"
-            coords = coords_str.split()
-            if len(coords) != 2:
-                raise ValueError("Invalid coordinate format in autocomplete result")
-
-            point = (float(coords[0]), float(coords[1]))
+            # Use coordinates from the model
+            point = (best_match.coordinates.longitude, best_match.coordinates.latitude)
             search_address_normalized = address.lower().strip()
             logger.info(f"Found coordinates: {point}")
 
@@ -524,8 +592,10 @@ class GovmapClient:
             # Extract unique polygon IDs
             polygon_ids = set()
             for deal in nearby_deals:
-                if "polygon_id" in deal:
-                    polygon_ids.add(str(deal["polygon_id"]))
+                # Try to get polygon_id from the deal model
+                polygon_id = getattr(deal, 'polygon_id', None) or deal.source_polygon_id
+                if polygon_id:
+                    polygon_ids.add(str(polygon_id))
 
             logger.info(f"Found {len(polygon_ids)} unique polygon IDs")
 
@@ -565,36 +635,38 @@ class GovmapClient:
                     # Process street deals and separate building deals
                     for deal in current_street_deals:
                         # Create unique deal ID for deduplication
-                        deal_id = f"{deal.get('dealId', '')}{deal.get('dealDate', '')}"
+                        deal_id = f"{deal.objectid}{deal.deal_date}"
                         if deal_id not in seen_deals:
                             seen_deals.add(deal_id)
-                            deal["source_polygon_id"] = polygon_id
-                            deal["deal_source"] = "street"
+                            # Store metadata using dynamic attributes (allowed by extra='allow')
+                            deal.source_polygon_id = polygon_id
+                            deal.deal_source = "street"
 
                             # Check if this is from the same building
-                            # Construct address from API fields (API doesn't have single "address" field)
-                            street = deal.get("streetNameHeb", "")
-                            house_num = str(deal.get("houseNum", ""))
+                            # Construct address from model fields
+                            street = deal.street_name or ""
+                            house_num = str(deal.house_number or "")
                             deal_address = f"{street} {house_num}".lower().strip()
                             if self._is_same_building(
                                 search_address_normalized, deal_address
                             ):
-                                deal["deal_source"] = "same_building"
-                                deal["priority"] = 0  # Highest priority
+                                deal.deal_source = "same_building"
+                                deal.priority = 0  # Highest priority
                                 building_deals.append(deal)
                             else:
-                                deal["priority"] = 1  # Street deals priority
+                                deal.priority = 1  # Street deals priority
                                 street_deals.append(deal)
 
                     # Add neighborhood deals with lowest priority
                     for deal in current_neighborhood_deals:
                         # Create unique deal ID for deduplication
-                        deal_id = f"{deal.get('dealId', '')}{deal.get('dealDate', '')}"
+                        deal_id = f"{deal.objectid}{deal.deal_date}"
                         if deal_id not in seen_deals:
                             seen_deals.add(deal_id)
-                            deal["source_polygon_id"] = polygon_id
-                            deal["deal_source"] = "neighborhood"
-                            deal["priority"] = 2  # Lowest priority
+                            # Store metadata using dynamic attributes
+                            deal.source_polygon_id = polygon_id
+                            deal.deal_source = "neighborhood"
+                            deal.priority = 2  # Lowest priority
                             neighborhood_deals.append(deal)
 
                 except Exception as e:
@@ -607,39 +679,28 @@ class GovmapClient:
             # Use stable sort: first by date (newest first), then by priority
             # Since Python's sort is stable, the second sort maintains date order within each priority
             all_deals.sort(
-                key=lambda x: x.get("dealDate", "1900-01-01"), reverse=True
+                key=lambda x: x.deal_date or "1900-01-01", reverse=True
             )  # Newest first
             all_deals.sort(
-                key=lambda x: x.get("priority", 3)
+                key=lambda x: getattr(x, 'priority', 3)
             )  # Priority first (0=building, 1=street, 2=neighborhood)
 
             # Limit to max_deals
             if len(all_deals) > max_deals:
                 all_deals = all_deals[:max_deals]
 
-            # Add price per square meter calculation and deal type info
+            # Add deal type metadata for clarity
+            # Note: price_per_sqm is now a computed field on the Deal model
             for deal in all_deals:
-                price = deal.get("dealAmount", 0)
-                area = deal.get("assetArea", 0)
-                if (
-                    isinstance(price, (int, float))
-                    and isinstance(area, (int, float))
-                    and area > 0
-                ):
-                    deal["price_per_sqm"] = round(price / area, 2)
-                else:
-                    deal["price_per_sqm"] = None
-
-                # Add deal type description for clarity
-                deal["deal_type"] = deal_type
-                deal["deal_type_description"] = (
+                deal.deal_type = deal_type
+                deal.deal_type_description = (
                     "first_hand_new" if deal_type == 1 else "second_hand_used"
                 )
 
             logger.info(
                 f"Found {len(all_deals)} total deals for address: {address} "
                 f"(Building: {len(building_deals)}, Street: {len(street_deals)}, Neighborhood: {len(neighborhood_deals)}) "
-                f"[{all_deals[0]['deal_type_description'] if all_deals else 'N/A'}]"
+                f"[{all_deals[0].deal_type_description if all_deals else 'N/A'}]"
             )
             return all_deals
 
@@ -650,7 +711,7 @@ class GovmapClient:
     # Filtering methods (delegate to filters module)
     def filter_deals_by_criteria(
         self,
-        deals: List[Dict[str, Any]],
+        deals: List[Deal],
         property_type: Optional[str] = None,
         min_rooms: Optional[float] = None,
         max_rooms: Optional[float] = None,
@@ -660,11 +721,26 @@ class GovmapClient:
         max_area: Optional[float] = None,
         min_floor: Optional[int] = None,
         max_floor: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Deal]:
         """
         Filter deals by various criteria.
 
         Delegates to filters.filter_deals_by_criteria for the actual filtering logic.
+
+        Args:
+            deals: List of Deal model instances to filter
+            property_type: Property type to filter by (Hebrew description)
+            min_rooms: Minimum number of rooms
+            max_rooms: Maximum number of rooms
+            min_price: Minimum deal amount
+            max_price: Maximum deal amount
+            min_area: Minimum asset area (square meters)
+            max_area: Maximum asset area (square meters)
+            min_floor: Minimum floor number
+            max_floor: Maximum floor number
+
+        Returns:
+            Filtered list of Deal instances
         """
         return filters.filter_deals_by_criteria(
             deals=deals,
@@ -680,11 +756,17 @@ class GovmapClient:
         )
 
     # Statistics methods (delegate to statistics module)
-    def calculate_deal_statistics(self, deals: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def calculate_deal_statistics(self, deals: List[Deal]) -> DealStatistics:
         """
         Calculate statistical aggregations on deal data.
 
         Delegates to statistics.calculate_deal_statistics for the actual calculations.
+
+        Args:
+            deals: List of Deal model instances
+
+        Returns:
+            DealStatistics model with comprehensive metrics
         """
         return statistics.calculate_deal_statistics(deals)
 
@@ -698,43 +780,70 @@ class GovmapClient:
 
     # Market analysis methods (delegate to market_analysis module)
     def _parse_deal_dates(
-        self, deals: List[Dict[str, Any]], time_period_months: Optional[int] = None
+        self, deals: List[Deal], time_period_months: Optional[int] = None
     ):
         """
         Parse and filter deal dates from a list of deals.
 
         Delegates to market_analysis.parse_deal_dates for the actual parsing.
+
+        Args:
+            deals: List of Deal model instances
+            time_period_months: Optional time period to filter (from today backwards)
+
+        Returns:
+            Tuple containing deal dates, monthly distribution, and quarterly distribution
         """
         return market_analysis.parse_deal_dates(deals, time_period_months)
 
     def calculate_market_activity_score(
-        self, deals: List[Dict[str, Any]], time_period_months: int = 12
-    ) -> Dict[str, Any]:
+        self, deals: List[Deal], time_period_months: int = 12
+    ) -> MarketActivityScore:
         """
         Calculate market activity and liquidity metrics.
 
         Delegates to market_analysis.calculate_market_activity_score for the analysis.
+
+        Args:
+            deals: List of Deal model instances
+            time_period_months: Time period to analyze in months (default: 12)
+
+        Returns:
+            MarketActivityScore model with activity metrics
         """
         return market_analysis.calculate_market_activity_score(
             deals, time_period_months
         )
 
     def analyze_investment_potential(
-        self, deals: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, deals: List[Deal]
+    ) -> InvestmentAnalysis:
         """
         Analyze investment potential based on price trends and market stability.
 
         Delegates to market_analysis.analyze_investment_potential for the analysis.
+
+        Args:
+            deals: List of Deal model instances with price and date information
+
+        Returns:
+            InvestmentAnalysis model with investment metrics
         """
         return market_analysis.analyze_investment_potential(deals)
 
     def get_market_liquidity(
-        self, deals: List[Dict[str, Any]], time_period_months: int = 12
-    ) -> Dict[str, Any]:
+        self, deals: List[Deal], time_period_months: int = 12
+    ) -> LiquidityMetrics:
         """
         Get detailed market liquidity and turnover metrics.
 
         Delegates to market_analysis.get_market_liquidity for the analysis.
+
+        Args:
+            deals: List of Deal model instances
+            time_period_months: Time period to analyze in months (default: 12)
+
+        Returns:
+            LiquidityMetrics model with liquidity and velocity metrics
         """
         return market_analysis.get_market_liquidity(deals, time_period_months)

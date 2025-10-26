@@ -5,18 +5,21 @@ This module provides pure mathematical functions for analyzing real estate deal 
 """
 
 from collections import Counter
-from typing import Any, Dict, List
+from typing import List
+from datetime import datetime
+
+from .models import Deal, DealStatistics
 
 
-def calculate_deal_statistics(deals: List[Dict[str, Any]]) -> Dict[str, Any]:
+def calculate_deal_statistics(deals: List[Deal]) -> DealStatistics:
     """
     Calculate statistical aggregations on deal data.
 
     Args:
-        deals: List of deal dictionaries
+        deals: List of Deal model instances
 
     Returns:
-        Dictionary with statistical metrics
+        DealStatistics model with comprehensive metrics
 
     Raises:
         ValueError: If deals is not a valid list
@@ -25,46 +28,52 @@ def calculate_deal_statistics(deals: List[Dict[str, Any]]) -> Dict[str, Any]:
         raise ValueError("deals must be a list")
 
     if not deals:
-        return {
-            "count": 0,
-            "price_stats": {},
-            "area_stats": {},
-            "price_per_sqm_stats": {},
-            "room_distribution": {},
-        }
+        return DealStatistics(
+            total_deals=0,
+            price_statistics={},
+            area_statistics={},
+            price_per_sqm_statistics={},
+            property_type_distribution={},
+            date_range=None,
+        )
 
     # Extract numeric values
     prices = []
     areas = []
     price_per_sqm_values = []
-    rooms = []
+    property_types = []
+    deal_dates = []
 
     for deal in deals:
-        price = deal.get("dealAmount")
-        if isinstance(price, (int, float)) and price > 0:
-            prices.append(price)
+        # Prices
+        if deal.deal_amount and deal.deal_amount > 0:
+            prices.append(deal.deal_amount)
 
-        area = deal.get("assetArea")
-        if isinstance(area, (int, float)) and area > 0:
-            areas.append(area)
+        # Areas
+        if deal.asset_area and deal.asset_area > 0:
+            areas.append(deal.asset_area)
 
-        pps = deal.get("price_per_sqm")
-        if pps is None and price and area and area > 0:
-            pps = price / area
-        if isinstance(pps, (int, float)) and pps > 0:
-            price_per_sqm_values.append(pps)
+        # Price per sqm (use computed field)
+        if deal.price_per_sqm:
+            price_per_sqm_values.append(deal.price_per_sqm)
 
-        room_count = deal.get("assetRoomNum")
-        if isinstance(room_count, (int, float)):
-            rooms.append(room_count)
+        # Property types
+        if deal.property_type_description:
+            property_types.append(deal.property_type_description)
+
+        # Deal dates
+        if deal.deal_date:
+            deal_dates.append(deal.deal_date)
 
     # Calculate statistics
-    stats: Dict[str, Any] = {"count": len(deals)}
+    price_stats = {}
+    area_stats = {}
+    price_per_sqm_stats = {}
 
     # Price statistics
     if prices:
         sorted_prices = sorted(prices)
-        stats["price_stats"] = {
+        price_stats = {
             "mean": round(sum(prices) / len(prices), 2),
             "median": (sorted_prices[len(sorted_prices) // 2] + sorted_prices[(len(sorted_prices) - 1) // 2]) / 2,
             "min": min(prices),
@@ -78,7 +87,7 @@ def calculate_deal_statistics(deals: List[Dict[str, Any]]) -> Dict[str, Any]:
     # Area statistics
     if areas:
         sorted_areas = sorted(areas)
-        stats["area_stats"] = {
+        area_stats = {
             "mean": round(sum(areas) / len(areas), 2),
             "median": sorted_areas[len(sorted_areas) // 2],
             "min": min(areas),
@@ -90,7 +99,7 @@ def calculate_deal_statistics(deals: List[Dict[str, Any]]) -> Dict[str, Any]:
     # Price per sqm statistics
     if price_per_sqm_values:
         sorted_pps = sorted(price_per_sqm_values)
-        stats["price_per_sqm_stats"] = {
+        price_per_sqm_stats = {
             "mean": round(sum(price_per_sqm_values) / len(price_per_sqm_values), 2),
             "median": round(sorted_pps[len(sorted_pps) // 2], 2),
             "min": round(min(price_per_sqm_values), 2),
@@ -99,12 +108,44 @@ def calculate_deal_statistics(deals: List[Dict[str, Any]]) -> Dict[str, Any]:
             "p75": round(sorted_pps[(3 * len(sorted_pps)) // 4], 2),
         }
 
-    # Room distribution
-    if rooms:
-        room_counts = Counter(rooms)
-        stats["room_distribution"] = dict(sorted(room_counts.items()))
+    # Property type distribution
+    property_type_dist = {}
+    if property_types:
+        type_counts = Counter(property_types)
+        property_type_dist = dict(sorted(type_counts.items()))
 
-    return stats
+    # Date range
+    date_range_dict = None
+    if deal_dates:
+        try:
+            # Parse ISO date strings to get earliest and latest
+            parsed_dates = []
+            for date_str in deal_dates:
+                try:
+                    # Handle ISO format with timezone (e.g., "2025-01-01T00:00:00.000Z")
+                    if 'T' in date_str:
+                        date_str = date_str.split('T')[0]
+                    parsed_dates.append(date_str)
+                except:
+                    continue
+
+            if parsed_dates:
+                sorted_dates = sorted(parsed_dates)
+                date_range_dict = {
+                    "earliest": sorted_dates[0],
+                    "latest": sorted_dates[-1],
+                }
+        except:
+            pass
+
+    return DealStatistics(
+        total_deals=len(deals),
+        price_statistics=price_stats,
+        area_statistics=area_stats,
+        price_per_sqm_statistics=price_per_sqm_stats,
+        property_type_distribution=property_type_dist,
+        date_range=date_range_dict,
+    )
 
 
 def calculate_std_dev(values: List[float]) -> float:
