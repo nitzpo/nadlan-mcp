@@ -126,7 +126,7 @@ def calculate_deal_statistics(deals: List[Deal]) -> DealStatistics:
                     if 'T' in date_str:
                         date_str = date_str.split('T')[0]
                     parsed_dates.append(date_str)
-                except:
+                except (ValueError, TypeError):
                     continue
 
             if parsed_dates:
