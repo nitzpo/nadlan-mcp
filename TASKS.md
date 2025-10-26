@@ -103,24 +103,38 @@ This document tracks the implementation progress of the Nadlan-MCP improvement p
 - ✅ Fixed bug in `autocomplete_address` tool during E2E testing
 - ✅ Created comprehensive test coverage report
 
-## 🚧 In Progress
-
-None - Phase 3 is complete!
-
-## 📋 To-Do (Next Priority)
-
 ### Phase 4: Pydantic Models & Additional Enhancements
 
-#### 4.1 Pydantic Data Models (Deferred from Phase 3.2)
-- [ ] Create `govmap/models.py` with Pydantic models
-  - [ ] `Deal` model - Real estate deal
-  - [ ] `Address` model - Address with coordinates
-  - [ ] `MarketMetrics` model - Market analysis results
-  - [ ] `DealStatistics` model - Statistical results
-  - [ ] `DealFilters` model - Filter criteria
-- [ ] Update functions to use/return models (optional)
-- [ ] Add model validation tests
-- [ ] Add type stubs if needed
+#### Phase 4.1: Pydantic Data Models ✅ COMPLETE
+- ✅ Created `govmap/models.py` with 9 Pydantic v2 models
+  - ✅ `CoordinatePoint` - ITM coordinates (frozen/immutable)
+  - ✅ `Address` - Israeli address with coordinates
+  - ✅ `AutocompleteResult` & `AutocompleteResponse` - Search results
+  - ✅ `Deal` model with computed `price_per_sqm` field
+  - ✅ `DealStatistics` - Statistical aggregations
+  - ✅ `MarketActivityScore` - Market activity metrics
+  - ✅ `InvestmentAnalysis` - Investment potential
+  - ✅ `LiquidityMetrics` - Market liquidity
+  - ✅ `DealFilters` - Filter criteria with validation
+- ✅ Updated all functions to use/return models
+  - ✅ Updated `client.py` - All API methods return models
+  - ✅ Updated `statistics.py` - Returns `DealStatistics`
+  - ✅ Updated `filters.py` - Works with `List[Deal]`
+  - ✅ Updated `market_analysis.py` - Returns typed models
+  - ✅ Updated `fastmcp_server.py` - Serializes models to JSON
+- ✅ Created comprehensive model tests (`tests/govmap/test_models.py`, 36 tests)
+- ✅ Updated all existing tests for Pydantic models (174/174 passing)
+- ✅ Created MIGRATION.md guide for v1.x → v2.0
+- ✅ Documented in `.cursor/plans/PHASE4.1-STATUS.md`
+- ✅ All 174 tests passing ✅
+
+**Breaking Change:** v2.0.0 - All methods return Pydantic models instead of dicts
+
+## 🚧 In Progress
+
+None - Phase 4.1 is complete!
+
+## 📋 To-Do (Next Priority)
 
 #### 4.2 LLM-Friendly Tool Design
 - [ ] Add `summarized_response: bool = False` parameter to all tools
