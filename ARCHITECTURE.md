@@ -366,6 +366,9 @@ GOVMAP_REQUESTS_PER_SECOND=5.0
 GOVMAP_DEFAULT_RADIUS=50
 GOVMAP_DEFAULT_YEARS_BACK=2
 GOVMAP_DEFAULT_DEAL_LIMIT=100
+
+# Performance
+GOVMAP_MAX_POLYGONS=10  # Max polygons to query per search (limits API calls)
 ```
 
 ### Tuning Guidelines
@@ -379,6 +382,7 @@ GOVMAP_DEFAULT_DEAL_LIMIT=100
 - `MAX_RETRIES=2`
 - `RETRY_MAX_WAIT=5`
 - `REQUESTS_PER_SECOND=10.0`
+- `MAX_POLYGONS=5` (faster, fewer results)
 
 **Conservative (Shared API):**
 - `MAX_RETRIES=3`

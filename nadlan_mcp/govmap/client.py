@@ -604,6 +604,12 @@ class GovmapClient:
 
             logger.info(f"Found {len(polygon_ids)} unique polygon IDs")
 
+            # Limit polygons to query (performance optimization)
+            max_polygons = self.config.max_polygons_to_query
+            if len(polygon_ids) > max_polygons:
+                polygon_ids = list(polygon_ids)[:max_polygons]
+                logger.info(f"Limited to {max_polygons} polygons for performance")
+
             # Step 3: Calculate date range
             end_date = datetime.now()
             start_date = end_date - timedelta(days=years_back * 365)
@@ -618,6 +624,12 @@ class GovmapClient:
             seen_deals = set()  # For deduplication
 
             for polygon_id in polygon_ids:
+                # Early termination if we have enough deals
+                total_collected = len(building_deals) + len(street_deals) + len(neighborhood_deals)
+                if total_collected >= max_deals:
+                    logger.info(f"Collected {total_collected} deals, stopping polygon queries")
+                    break
+
                 try:
                     # Get street deals first (higher priority)
                     current_street_deals = self.get_street_deals(
@@ -628,14 +640,17 @@ class GovmapClient:
                         deal_type=deal_type,
                     )
 
-                    # Get neighborhood deals (lower priority)
-                    current_neighborhood_deals = self.get_neighborhood_deals(
-                        polygon_id,
-                        limit=max_deals // 4,  # Allocate less to neighborhood deals
-                        start_date=start_date_str,
-                        end_date=end_date_str,
-                        deal_type=deal_type,
-                    )
+                    # Get neighborhood deals (lower priority) - optional for performance
+                    current_neighborhood_deals = []
+                    # Skip neighborhood deals if we have enough street deals
+                    if len(street_deals) < max_deals // 2:
+                        current_neighborhood_deals = self.get_neighborhood_deals(
+                            polygon_id,
+                            limit=max_deals // 4,  # Allocate less to neighborhood deals
+                            start_date=start_date_str,
+                            end_date=end_date_str,
+                            deal_type=deal_type,
+                        )
 
                     # Process street deals and separate building deals
                     for deal in current_street_deals:

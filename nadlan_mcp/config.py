@@ -57,6 +57,11 @@ class GovmapConfig:
     default_deal_limit: int = field(
         default_factory=lambda: int(os.getenv("GOVMAP_DEFAULT_DEAL_LIMIT", "100"))
     )
+
+    # Performance optimization
+    max_polygons_to_query: int = field(
+        default_factory=lambda: int(os.getenv("GOVMAP_MAX_POLYGONS", "10"))
+    )
     
     # User agent
     user_agent: str = field(
@@ -90,6 +95,8 @@ class GovmapConfig:
             raise ValueError("default_years_back must be positive")
         if self.default_deal_limit <= 0:
             raise ValueError("default_deal_limit must be positive")
+        if self.max_polygons_to_query <= 0:
+            raise ValueError("max_polygons_to_query must be positive")
         if not self.base_url:
             raise ValueError("base_url cannot be empty")
         if not self.user_agent:

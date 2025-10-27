@@ -55,10 +55,11 @@ def validate_coordinates(point: Tuple[float, float]) -> Tuple[float, float]:
         raise ValueError("Coordinates must be numeric values")
 
     # Basic validation for Israeli coordinates (ITM projection)
-    if not (0 < lon < 400000):  # Rough bounds for Israeli ITM longitude
-        logger.warning(f"Longitude {lon} may be outside Israeli bounds")
-    if not (0 < lat < 1400000):  # Rough bounds for Israeli ITM latitude
-        logger.warning(f"Latitude {lat} may be outside Israeli bounds")
+    # ITM bounds for Israel: X (longitude) ~150,000-300,000, Y (latitude) ~3,500,000-4,000,000
+    if not (150000 <= lon <= 300000):  # ITM longitude bounds for Israel
+        logger.warning(f"Longitude {lon} appears to be outside Israeli ITM bounds (150,000-300,000)")
+    if not (3500000 <= lat <= 4000000):  # ITM latitude bounds for Israel
+        logger.warning(f"Latitude {lat} appears to be outside Israeli ITM bounds (3,500,000-4,000,000)")
 
     return (lon, lat)
 
