@@ -1,0 +1,35 @@
+[
+  {
+    "text": "סוקולוב חולון",
+    "id": "street|STREET_MID_POINT|40087",
+    "type": "street",
+    "score": 1658.0989,
+    "coordinates": {
+      "longitude": 3871467.9873431968,
+      "latitude": 3766276.9742487124
+    },
+    "shape": "POINT(3871467.9873431968 3766276.9742487124)"
+  },
+  {
+    "text": "קופת חולים - לאומית סוקולוב חולון",
+    "id": "institutes|POI_BLDG|71871",
+    "type": "institutes",
+    "score": 1095.5675,
+    "coordinates": {
+      "longitude": 3871143.6159368134,
+      "latitude": 3766329.3192062005
+    },
+    "shape": "POINT(3871143.6159368134 3766329.3192062005)"
+  },
+  {
+    "text": "קופת חולים - לאומית סוקולוב חולון",
+    "id": "poi|POI_MID_POINT|102233",
+    "type": "poi",
+    "score": 1099.5448,
+    "coordinates": {
+      "longitude": 3871143.6159681133,
+      "latitude": 3766329.319199102
+    },
+    "shape": "POINT(3871143.6159681133 3766329.319199102)"
+  }
+]
