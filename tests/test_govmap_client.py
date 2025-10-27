@@ -128,14 +128,16 @@ class TestGovmapClient:
     
     @patch('requests.Session')
     def test_get_deals_by_radius_success(self, mock_session_class):
-        """Test successful deals by radius query."""
+        """Test successful polygon metadata retrieval by radius."""
         mock_response = Mock()
+        # API returns polygon metadata (not actual deals)
         mock_response.json.return_value = [
             {
                 "objectid": 12345,
-                "dealAmount": 1500000.0,
-                "dealDate": "2024-01-15",
+                "dealscount": "30",
                 "settlementNameHeb": "תל אביב-יפו",
+                "streetNameHeb": "דיזנגוף",
+                "houseNum": 50,
                 "polygon_id": "123-456"
             }
         ]
@@ -148,11 +150,11 @@ class TestGovmapClient:
         client = GovmapClient()
         result = client.get_deals_by_radius((3870000.123, 3770000.456), radius=50)
 
-        # Now returns List[Deal]
+        # Now returns List[Dict] - polygon metadata, not Deal objects
         assert len(result) == 1
-        assert isinstance(result[0], Deal)
-        assert result[0].objectid == 12345
-        assert result[0].settlement_name_heb == "תל אביב-יפו"
+        assert isinstance(result[0], dict)
+        assert result[0]["objectid"] == 12345
+        assert result[0]["polygon_id"] == "123-456"
         mock_session.get.assert_called_once()
     
     @patch('requests.Session')
@@ -245,9 +247,9 @@ class TestGovmapClient:
             ]
         )
 
-        # Mock radius response - now returns List[Deal]
+        # Mock radius response - now returns List[Dict] (polygon metadata)
         mock_radius.return_value = [
-            Deal(objectid=1, deal_amount=1500000, deal_date="2025-01-01", polygon_id="123-456")
+            {"objectid": 1, "dealscount": "10", "polygon_id": "123-456", "settlementNameHeb": "Tel Aviv"}
         ]
 
         # Mock street deals response - now returns List[Deal]

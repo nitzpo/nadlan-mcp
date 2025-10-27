@@ -130,59 +130,57 @@ class TestGetDealsByRadius:
 
     @patch('nadlan_mcp.fastmcp_server.client')
     def test_successful_get_deals(self, mock_client):
-        """Test successful deal retrieval."""
-        # Mock with Deal models
-        mock_deals = [
-            Deal(
-                objectid=123,
-                deal_amount=2000000,
-                deal_date="2023-01-01",
-                asset_area=80.0,
-                street_name="דיזנגוף"
-            )
+        """Test successful polygon metadata retrieval."""
+        # Mock with polygon metadata dicts (not Deal objects)
+        mock_polygons = [
+            {
+                "objectid": 123,
+                "dealscount": "30",
+                "settlementNameHeb": "תל אביב-יפו",
+                "streetNameHeb": "דיזנגוף",
+                "houseNum": 50,
+                "polygon_id": "123-456"
+            }
         ]
-        mock_client.get_deals_by_radius.return_value = mock_deals
+        mock_client.get_deals_by_radius.return_value = mock_polygons
 
         result = fastmcp_server.get_deals_by_radius(650000.0, 180000.0, 500)
         parsed = json.loads(result)
 
-        assert len(parsed["deals"]) == 1
-        assert parsed["deals"][0]["deal_amount"] == 2000000  # Use snake_case field name
-        assert parsed["total_deals"] == 1
+        assert len(parsed["polygons"]) == 1
+        assert parsed["polygons"][0]["dealscount"] == "30"
+        assert parsed["total_polygons"] == 1
         mock_client.get_deals_by_radius.assert_called_once()
 
     @patch('nadlan_mcp.fastmcp_server.client')
     def test_get_deals_no_results(self, mock_client):
-        """Test deal retrieval with no results."""
+        """Test polygon metadata retrieval with no results."""
         mock_client.get_deals_by_radius.return_value = []
 
         result = fastmcp_server.get_deals_by_radius(650000.0, 180000.0, 500)
-        assert "No deals found" in result or json.loads(result)["total_deals"] == 0
+        assert "No polygons found" in result
 
     @patch('nadlan_mcp.fastmcp_server.client')
     def test_get_deals_strips_bloat_fields(self, mock_client):
-        """Test that bloat fields are stripped from response."""
-        # Mock with Deal models, not dicts
-        mock_deals = [
-            Deal(
-                objectid=123,
-                deal_amount=2000000,
-                deal_date="2023-01-01",
-                shape="MULTIPOLYGON(...huge data...)",
-                sourceorder=1,
-                source_polygon_id="abc123"
-            )
+        """Test that polygon metadata is returned as-is."""
+        # Mock with polygon metadata dicts
+        mock_polygons = [
+            {
+                "objectid": 123,
+                "dealscount": "10",
+                "polygon_id": "abc123",
+                "settlementNameHeb": "Tel Aviv"
+            }
         ]
-        mock_client.get_deals_by_radius.return_value = mock_deals
+        mock_client.get_deals_by_radius.return_value = mock_polygons
 
         result = fastmcp_server.get_deals_by_radius(650000.0, 180000.0, 500)
         parsed = json.loads(result)
 
-        # Verify bloat fields are removed
-        deal = parsed["deals"][0]
-        assert "shape" not in deal
-        assert "sourceorder" not in deal
-        # source_polygon_id is kept when added by our processing
+        # Polygon metadata is returned as-is (no stripping needed)
+        polygon = parsed["polygons"][0]
+        assert polygon["polygon_id"] == "abc123"
+        assert polygon["dealscount"] == "10"
 
     @patch('nadlan_mcp.fastmcp_server.client')
     def test_get_deals_error_handling(self, mock_client):

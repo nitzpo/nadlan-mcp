@@ -256,16 +256,22 @@ class GovmapClient:
 
     def get_deals_by_radius(
         self, point: Tuple[float, float], radius: int = 50
-    ) -> List[Deal]:
+    ) -> List[Dict[str, Any]]:
         """
-        Find real estate deals within a specified radius of a point.
+        Find polygon metadata within a specified radius of a point.
+
+        **NOTE**: This endpoint returns polygon metadata, NOT actual deal transactions!
+        The response contains polygon_id, dealscount, settlementNameHeb, etc.
+        To get actual deals, extract polygon_ids and call get_street_deals() or get_neighborhood_deals().
+
+        Use find_recent_deals_for_address() for the complete workflow.
 
         Args:
             point: A tuple of (longitude, latitude)
             radius: The search radius in meters (default: 50)
 
         Returns:
-            List of Deal models found within the radius
+            List of polygon metadata dicts (not Deal objects)
 
         Raises:
             requests.RequestException: If the API request fails after retries
@@ -293,17 +299,16 @@ class GovmapClient:
                         f"Expected list response, got {type(data).__name__}"
                     )
 
-                # Parse each deal dict into Deal model
-                deals = []
-                for deal_dict in data:
-                    try:
-                        deal = Deal.model_validate(deal_dict)
-                        deals.append(deal)
-                    except Exception as e:
-                        logger.warning(f"Failed to parse deal: {e}. Skipping deal.")
-                        continue
+                # NOTE: This endpoint returns polygon metadata, not actual deals!
+                # The response contains: dealscount, polygon_id, settlementNameHeb, streetNameHeb, houseNum, objectid
+                # We return these as-is (raw dicts) since they're used only for extracting polygon_ids
+                # in find_recent_deals_for_address()
+                logger.info(f"Found {len(data)} polygon metadata records")
 
-                return deals
+                # For backward compatibility, return empty list of Deals since these aren't actual deals
+                # The raw data is available in the response but we don't try to validate as Deal objects
+                # TODO: Consider creating a PolygonMetadata model for type safety
+                return data  # Return raw dicts temporarily
 
             except (requests.RequestException, requests.Timeout) as e:
                 if attempt < self.config.max_retries:
@@ -586,14 +591,14 @@ class GovmapClient:
             search_address_normalized = address.lower().strip()
             logger.info(f"Found coordinates: {point}")
 
-            # Step 2: Get deals by radius to find polygon IDs
-            nearby_deals = self.get_deals_by_radius(point, radius=radius)
+            # Step 2: Get polygon metadata by radius to find polygon IDs
+            nearby_polygons = self.get_deals_by_radius(point, radius=radius)
 
-            # Extract unique polygon IDs
+            # Extract unique polygon IDs from metadata dicts
             polygon_ids = set()
-            for deal in nearby_deals:
-                # Try to get polygon_id from the deal model
-                polygon_id = getattr(deal, 'polygon_id', None) or deal.source_polygon_id
+            for metadata in nearby_polygons:
+                # Extract polygon_id from dict (these are polygon metadata, not deals)
+                polygon_id = metadata.get('polygon_id')
                 if polygon_id:
                     polygon_ids.add(str(polygon_id))
 

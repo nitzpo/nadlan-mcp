@@ -96,33 +96,37 @@ def autocomplete_address(search_text: str) -> str:
 
 @mcp.tool()
 def get_deals_by_radius(latitude: float, longitude: float, radius_meters: int = 500) -> str:
-    """Get real estate deals within a radius of coordinates.
-    
+    """Get polygon metadata within a radius of coordinates.
+
+    **NOTE**: This returns polygon/area metadata, NOT individual deal transactions!
+    Use find_recent_deals_for_address() to get actual deals.
+
     Args:
         latitude: Latitude coordinate
-        longitude: Longitude coordinate  
+        longitude: Longitude coordinate
         radius_meters: Search radius in meters (default: 500)
-        
+
     Returns:
-        JSON string containing recent real estate deals in the area
+        JSON string containing polygon metadata (areas with deals nearby)
     """
     try:
         # Note: GovmapClient expects (longitude, latitude) tuple
-        deals = client.get_deals_by_radius((longitude, latitude), radius_meters)
-        
-        if not deals:
-            return f"No deals found within {radius_meters}m of coordinates ({latitude}, {longitude})"
-        
+        # Returns polygon metadata dicts, not Deal objects
+        polygons = client.get_deals_by_radius((longitude, latitude), radius_meters)
+
+        if not polygons:
+            return f"No polygons found within {radius_meters}m of coordinates ({latitude}, {longitude})"
+
         return json.dumps({
-            "total_deals": len(deals),
+            "total_polygons": len(polygons),
             "search_radius_meters": radius_meters,
             "center_coordinates": {"latitude": latitude, "longitude": longitude},
-            "deals": strip_bloat_fields(deals)
+            "polygons": polygons  # Return dicts directly, no stripping needed
         }, ensure_ascii=False, indent=2)
-        
+
     except Exception as e:
         logger.error(f"Error in get_deals_by_radius: {e}")
-        return f"Error fetching deals by radius: {str(e)}"
+        return f"Error fetching polygons by radius: {str(e)}"
 
 @mcp.tool()
 def get_street_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> str:
