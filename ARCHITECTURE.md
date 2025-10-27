@@ -119,36 +119,82 @@ set_config(custom_config)
 **Purpose:** Modular package for Govmap API interaction and data processing
 
 **Package Structure:**
-- `client.py` - GovmapClient class with API methods
+- `models.py` - **Pydantic v2 data models** (9 models, type-safe, validated)
+- `client.py` - GovmapClient class with API methods (returns models)
 - `validators.py` - Input validation functions
-- `filters.py` - Deal filtering logic
-- `statistics.py` - Statistical calculations
-- `market_analysis.py` - Market analysis functions
+- `filters.py` - Deal filtering logic (accepts/returns models)
+- `statistics.py` - Statistical calculations (returns models)
+- `market_analysis.py` - Market analysis functions (returns models)
 - `utils.py` - Helper utilities
 - `__init__.py` - Public API exports
+
+#### Pydantic Models Layer (`govmap/models.py`) ✨ **NEW in v2.0.0**
+
+**Purpose:** Type-safe, validated data models for all API responses and business logic
+
+**9 Comprehensive Models:**
+- `CoordinatePoint` - ITM coordinates (frozen/immutable)
+- `Address` - Israeli address with optional coordinates
+- `AutocompleteResult` & `AutocompleteResponse` - Search results
+- `Deal` - Real estate transaction with computed `price_per_sqm` field
+- `DealStatistics` - Statistical aggregations
+- `MarketActivityScore` - Market activity metrics
+- `InvestmentAnalysis` - Investment potential analysis
+- `LiquidityMetrics` - Market liquidity metrics
+- `DealFilters` - Filter criteria with validation
+
+**Key Features:**
+- **Field Aliasing:** API camelCase ↔ Python snake_case (e.g., `dealAmount` ↔ `deal_amount`)
+- **Computed Fields:** Auto-calculate price per sqm using `@computed_field`
+- **Validation:** Automatic data validation with clear error messages
+- **Serialization:** Easy conversion to/from JSON via `.model_dump()`
+- **Type Safety:** Full IDE autocomplete and mypy support
+
+**Usage:**
+```python
+from nadlan_mcp.govmap import GovmapClient
+from nadlan_mcp.govmap.models import Deal, AutocompleteResponse
+
+client = GovmapClient()
+
+# Returns AutocompleteResponse model
+result = client.autocomplete_address("חולון")
+coords = result.results[0].coordinates  # Optional[CoordinatePoint]
+
+# Returns List[Deal]
+deals = client.get_street_deals("polygon123")
+for deal in deals:
+    price = deal.deal_amount  # float (snake_case)
+    price_per_sqm = deal.price_per_sqm  # Computed field!
+
+# Serialize to dict/JSON when needed
+deal_dict = deal.model_dump()
+deal_json = deal.model_dump_json()
+```
 
 #### GovmapClient Class (`govmap/client.py`)
 
 **Responsibilities:**
 - Make HTTP requests to Govmap API
+- Parse JSON responses into Pydantic models
 - Implement retry logic with exponential backoff
 - Enforce rate limiting
 - Delegate to specialized modules for validation, filtering, analysis
 
-**Core API Methods:**
-- `autocomplete_address()` - Search for addresses
-- `get_gush_helka()` - Get block/parcel data
-- `get_deals_by_radius()` - Get nearby deals
-- `get_street_deals()` - Get street-level deals
-- `get_neighborhood_deals()` - Get neighborhood deals
-- `find_recent_deals_for_address()` - Main comprehensive search
+**Core API Methods (all return Pydantic models):**
+- `autocomplete_address()` → `AutocompleteResponse`
+- `get_gush_helka()` → `Dict` (parcel metadata)
+- `get_deals_by_radius()` → `List[Deal]`
+- `get_street_deals()` → `List[Deal]`
+- `get_neighborhood_deals()` → `List[Deal]`
+- `find_recent_deals_for_address()` → `List[Deal]`
 
-**Business Logic Methods** (delegate to respective modules):
-- `filter_deals_by_criteria()` - Filter deals by various criteria
-- `calculate_deal_statistics()` - Calculate statistical metrics
-- `calculate_market_activity_score()` - Analyze market activity
-- `analyze_investment_potential()` - Analyze investment potential
-- `get_market_liquidity()` - Analyze market liquidity
+**Business Logic Methods (delegate to modules, return models):**
+- `filter_deals_by_criteria()` → `List[Deal]`
+- `calculate_deal_statistics()` → `DealStatistics`
+- `calculate_market_activity_score()` → `MarketActivityScore`
+- `analyze_investment_potential()` → `InvestmentAnalysis`
+- `get_market_liquidity()` → `LiquidityMetrics`
 
 **Reliability Features:**
 1. **Retry Logic** - Exponential backoff on failures
@@ -407,11 +453,11 @@ nadlan_mcp/
     ├── __init__.py             # Public API exports
     ├── client.py               # Core API client (~300 lines)
     ├── validators.py           # Input validation (~100 lines)
+    ├── models.py               # ✅ Pydantic v2 models (~340 lines)
     ├── filters.py              # Deal filtering (~150 lines)
     ├── statistics.py           # Statistical calculations (~150 lines)
     ├── market_analysis.py      # Market analysis (~400 lines)
-    ├── utils.py                # Helper utilities (~100 lines)
-    └── models.py               # Pydantic models (optional)
+    └── utils.py                # Helper utilities (~100 lines)
 ```
 
 **Benefits:**
@@ -447,9 +493,10 @@ nadlan_mcp/
    - Address matching, text normalization, helpers
    - Reusable across modules
 
-7. **models.py** - Pydantic data models (optional)
-   - Deal, Address, MarketMetrics, DealStatistics
-   - Type safety and validation
+7. **models.py** - Pydantic v2 data models ✅ **IMPLEMENTED**
+   - 9 models: Deal, Address, AutocompleteResponse, DealStatistics, etc.
+   - Type safety, validation, computed fields
+   - Field aliasing for API compatibility
 
 **Backward Compatibility:**
 ```python
@@ -462,20 +509,33 @@ from nadlan_mcp.govmap import GovmapClient
 from nadlan_mcp.govmap.filters import filter_deals_by_criteria
 ```
 
-### Phase 4: Pydantic Data Models (Optional)
+### Phase 4: Pydantic Data Models ✅ **IMPLEMENTED in v2.0.0**
 
-Add structured models for type safety:
+Comprehensive Pydantic v2 models with type safety and validation:
 ```python
-class Deal(BaseModel):
-    deal_id: str
-    address: str
-    deal_amount: float
-    asset_area: float
-    price_per_sqm: float
-    deal_date: datetime
-    property_type: str
-    # ...
+from nadlan_mcp.govmap.models import Deal, DealStatistics, AutocompleteResponse
+
+# Deal model with computed fields
+deal = Deal(
+    objectid=123,
+    deal_amount=1500000.0,
+    deal_date="2024-01-15",
+    asset_area=85.0
+)
+# price_per_sqm automatically computed!
+assert deal.price_per_sqm == 17647.06
+
+# Field aliases support both API and Python naming
+deal = Deal(dealAmount=1500000, assetArea=85, ...)  # API style
+deal = Deal(deal_amount=1500000, asset_area=85, ...)  # Python style
 ```
+
+**9 Models Implemented:**
+- CoordinatePoint, Address, AutocompleteResult, AutocompleteResponse
+- Deal, DealStatistics, DealFilters
+- MarketActivityScore, InvestmentAnalysis, LiquidityMetrics
+
+See `MIGRATION.md` for v1.x → v2.0 upgrade guide.
 
 ### Phase 5: Database Layer (Future - Optional)
 

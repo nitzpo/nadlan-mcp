@@ -122,26 +122,22 @@ This document tracks the implementation progress of the Nadlan-MCP improvement p
   - ✅ Updated `filters.py` - Works with `List[Deal]`
   - ✅ Updated `market_analysis.py` - Returns typed models
   - ✅ Updated `fastmcp_server.py` - Serializes models to JSON
-- ✅ Created comprehensive model tests (`tests/govmap/test_models.py`, 36 tests)
-- ✅ Updated all existing tests for Pydantic models (174/174 passing)
+- ✅ Created comprehensive model tests (`tests/govmap/test_models.py`, 50+ tests)
+- ✅ Updated all existing tests for Pydantic models (195/195 passing)
 - ✅ Created MIGRATION.md guide for v1.x → v2.0
+- ✅ Updated ARCHITECTURE.md with Pydantic layer documentation
+- ✅ Updated CLAUDE.md with model usage patterns
+- ✅ Version bumped to 2.0.0
 - ✅ Documented in `.cursor/plans/PHASE4.1-STATUS.md`
-- ✅ All 174 tests passing ✅
+- ✅ All 195 tests passing (including 11 integration tests) ✅
 
 **Breaking Change:** v2.0.0 - All methods return Pydantic models instead of dicts
 
 ## 🚧 In Progress
 
-None - Phase 4.1 is complete!
+None - Phase 4.1 complete!
 
 ## 📋 To-Do (Next Priority)
-
-#### 4.2 LLM-Friendly Tool Design
-- [ ] Add `summarized_response: bool = False` parameter to all tools
-- [ ] Implement summarization logic for each tool
-- [ ] Update tool docstrings with parameter descriptions
-- [ ] Test both modes (structured and summarized)
-- [ ] Update documentation with examples
 
 ### Phase 5: Testing & Quality
 
@@ -224,6 +220,15 @@ None - Phase 4.1 is complete!
 
 ## 🔮 Future Features (Backlog)
 
+### Phase 4.2: LLM-Friendly Tool Design (Optional - Deferred)
+- [ ] Add `summarized_response: bool = False` parameter to all tools
+- [ ] Implement summarization logic for each tool
+- [ ] Update tool docstrings with parameter descriptions
+- [ ] Test both modes (structured and summarized)
+- [ ] Update documentation with examples
+
+**Note:** Deferred as we already have summarizations inside JSON output of MCP tools. May revisit if needed.
+
 ### Phase 8.1: Amenity Scoring
 - [ ] Research Google Places API integration
 - [ ] Research OpenStreetMap integration
@@ -279,9 +284,10 @@ None - Phase 4.1 is complete!
 - Phase 2.2 (Market Analysis): ✅ 100% complete
 - Phase 2.3 (Enhanced Filtering): ✅ 100% complete
 - Phase 3 (Architecture Refactoring): ✅ 100% complete
-- Phase 4 (Pydantic Models): 📋 0% started (NEXT PRIORITY)
-- Phase 5 (Testing): 🚧 50% complete (138 tests, comprehensive unit tests added)
-- Phase 6 (Documentation): 🚧 60% complete (USECASES, ARCHITECTURE, CLAUDE, TASKS, TEST_COVERAGE_REPORT done)
+- Phase 4.1 (Pydantic Models): ✅ 100% complete (v2.0.0 released)
+- Phase 4.2 (LLM Tool Design): 📋 Deferred to backlog (optional)
+- Phase 5 (Testing): 🚧 75% complete (195 tests including integration tests)
+- Phase 6 (Documentation): ✅ 90% complete (all major docs updated for v2.0)
 - Phase 7 (Polish): 🚧 33% complete (cleanup done, linting pending)
 - Phase 8 (Future): 📋 Backlog
 
@@ -292,31 +298,35 @@ None - Phase 4.1 is complete!
 - ✅ Phase 2.3: Enhanced Filtering - COMPLETE
 - ✅ Phase 3: Architecture Improvements & Package Refactoring - COMPLETE
 
-**🎉 PHASE 3 COMPLETE! Modular package structure with comprehensive test coverage.**
+**🎉 PHASE 4.1 COMPLETE! Pydantic v2 models with type safety and validation.**
 
-## 🎯 Completed This Sprint
+## 🎯 Completed This Sprint (Phase 4.1)
 
-1. ✅ **Refactored monolithic file into modular package** (Phase 3.1)
-   - Created 7 specialized modules (client, validators, filters, statistics, market_analysis, utils, __init__)
-   - Reduced file sizes from 1,454 lines to modules of 100-450 lines each
-2. ✅ **Increased test coverage by 304%** (Phase 3.1)
-   - Added 104 new tests (32 validator tests, 36 utils tests, 36 MCP tool tests)
-   - Total: 138 tests, all passing
-3. ✅ **Fixed autocomplete_address bug** (Phase 3.1)
-   - Corrected field mapping from API response
-   - Added WKT coordinate parsing
-4. ✅ **Maintained 100% backward compatibility** (Phase 3.1)
-   - All existing imports continue to work
-   - No breaking changes to public API
-5. ✅ **Updated documentation** (Phase 3.4)
-   - ARCHITECTURE.md, CLAUDE.md, TASKS.md updated
-   - Created TEST_COVERAGE_REPORT.md
+1. ✅ **Created 9 comprehensive Pydantic v2 models** (Phase 4.1)
+   - CoordinatePoint, Address, AutocompleteResult/Response, Deal
+   - DealStatistics, MarketActivityScore, InvestmentAnalysis, LiquidityMetrics, DealFilters
+   - ~340 lines with field aliases, computed fields, validation
+2. ✅ **Updated all code to use Pydantic models** (Phase 4.1)
+   - Updated client.py, filters.py, statistics.py, market_analysis.py, fastmcp_server.py
+   - All API methods now return type-safe models instead of dicts
+3. ✅ **Comprehensive testing** (Phase 4.1)
+   - Created test_models.py with 50+ model tests
+   - Updated all existing tests (195 tests total, all passing)
+   - Added 11 integration tests
+4. ✅ **Complete documentation** (Phase 4.1)
+   - Created MIGRATION.md with v1.x → v2.0 upgrade guide
+   - Updated ARCHITECTURE.md with Pydantic layer
+   - Updated CLAUDE.md with model usage patterns
+5. ✅ **Version 2.0.0 released** (Breaking change)
+   - All methods return Pydantic models instead of dicts
+   - Field names changed to snake_case
+   - Backward compatibility via .model_dump()
 
-## 🎯 Next Sprint - Phase 4
+## 🎯 Next Sprint - Phase 5
 
-1. **Create Pydantic data models** (Phase 4.1 - deferred from Phase 3.2)
-2. **Add summarized_response parameter to tools** (Phase 4.2)
-3. **Expand test coverage** (Phase 5.1)
+1. **Expand test coverage** (Phase 5.1)
+2. **Add integration tests** (Phase 5.1)
+3. **Code quality polish** (Phase 7)
 
 ## Notes
 
