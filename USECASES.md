@@ -17,18 +17,18 @@ The nadlan-mcp MCP server provides comprehensive Israeli real estate data analys
 - **Recent Deals by Address**: Find recent real estate transactions for any specific address
 - **Street-level Analysis**: Get all recent deals for an entire street/area
 - **Neighborhood Analysis**: Analyze deals across entire neighborhoods
-- **Deal Filtering**: Filter deals by property type, room count, price range, area, and floor (🚧 enhanced filtering in progress)
+- **Deal Filtering**: Filter deals by property type, room count, price range, area, and floor ✅
 
 ## 📈 **Market Intelligence** ✅
 
 - **Market Trends Analysis**: Analyze price patterns and market trends over time for any area
 - **Price per Square Meter Trends**: Track how property values change over time
-- **Market Activity Levels**: See how active the real estate market is in different areas (🚧 enhanced metrics in progress)
+- **Market Activity Levels**: See how active the real estate market is in different areas ✅
 
 ## 🔍 **Comparative Analysis** ✅
 
 - **Multi-Address Comparison**: Compare real estate markets between multiple addresses side-by-side
-- **Investment Analysis**: Compare different areas for investment potential (🚧 advanced metrics in progress)
+- **Investment Analysis**: Compare different areas for investment potential ✅
 
 ## 🏆 **Amenity Scoring & Quality of Life Analysis** 📋
 
@@ -60,7 +60,7 @@ This comprehensive feature will provide amenity-based location scoring using mul
 
 ### Investment Research ✅
 - Identify trending neighborhoods and price patterns
-- Analyze market activity levels across different areas (🚧 enhanced metrics in progress)
+- Analyze market activity levels across different areas ✅
 - Track price per square meter trends over time
 
 ### Market Analysis ✅
@@ -106,9 +106,6 @@ You can ask questions like:
 - `get_neighborhood_deals` - Get deals for a neighborhood polygon
 - `analyze_market_trends` - Analyze market trends and price patterns
 - `compare_addresses` - Compare real estate markets between multiple addresses
-
-### 🚧 In Progress
-
 - `get_valuation_comparables` - Get comparable properties for valuation analysis
 - `get_deal_statistics` - Calculate statistical aggregations on deal data
 - `get_market_activity_metrics` - Detailed market activity and velocity metrics
@@ -124,7 +121,7 @@ You can ask questions like:
 
 The data covers recent Israeli real estate transactions and can help with:
 - Property research and valuation ✅
-- Investment analysis and decision-making ✅ (🚧 advanced metrics in progress)
+- Investment analysis and decision-making ✅
 - Market understanding and trends ✅
 - Comparative analysis across locations ✅
 - Due diligence for real estate decisions ✅
@@ -136,34 +133,30 @@ Simply connect to the nadlan-mcp server through your MCP client (like Cursor) an
 
 ## 🔄 **Roadmap & Timeline**
 
-### Phase 1: Core Reliability & Quality (Current)
+### Phase 1-5: Core Features & Quality ✅ COMPLETE
 - ✅ Configuration management system
 - ✅ Retry logic with exponential backoff
 - ✅ Rate limiting protection
 - ✅ Input validation and error handling
-- 🚧 Enhanced deal filtering
-- 🚧 Valuation data provision tools
-- 🚧 Market activity metrics
+- ✅ Enhanced deal filtering
+- ✅ Valuation data provision tools
+- ✅ Market activity metrics
+- ✅ Pydantic data models
+- ✅ Comprehensive testing (304 tests, 84% coverage)
 
-### Phase 2: Architecture Improvements (Next)
-- Data models with Pydantic
-- Separation of concerns (API client, analyzers, tools)
-- LLM-friendly tool design with summarized_response parameter
-- Comprehensive testing suite
+### Phase 6-7: Documentation & Code Quality (In Progress)
+- Documentation improvements
+- Code formatting and linting with Ruff
+- Pre-commit hooks
+- Type checking with mypy
 
-### Phase 3: Documentation & Developer Experience
-- Architecture documentation
-- API reference guide
-- Usage examples
-- Contributing guidelines
-
-### Phase 4: Future Features
-- Amenity scoring with quality metrics
-- In-memory caching
-- Async/parallel processing
+### Phase 8: Future Features (Planned)
+- Amenity scoring with quality metrics (Google Places, school rankings, healthcare ratings)
+- In-memory caching with TTL
+- Async/parallel processing with httpx
 - Production-ready caching (Redis)
 - Multi-language support
-- Database integration
+- Database integration (SQLite/PostgreSQL)
 
 ## 📞 **Support & Contributions**
 

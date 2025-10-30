@@ -10,26 +10,20 @@ import vcr
 # Configure VCR instance
 my_vcr = vcr.VCR(
     # Store cassettes in tests/cassettes/ directory
-    cassette_library_dir='tests/cassettes',
-
+    cassette_library_dir="tests/cassettes",
     # Record mode: once = record once, then replay
     # Use 'new_episodes' to record new interactions but replay existing ones
-    record_mode='once',
-
+    record_mode="once",
     # Match requests by method and URI
-    match_on=['method', 'scheme', 'host', 'port', 'path', 'query'],
-
+    match_on=["method", "scheme", "host", "port", "path", "query"],
     # Filter out sensitive data from recordings
-    filter_headers=['authorization', 'x-api-key'],
-
+    filter_headers=["authorization", "x-api-key"],
     # Decode compressed responses for better diffs
     decode_compressed_response=True,
-
     # Serialize as YAML for human-readable diffs
-    serializer='yaml',
-
+    serializer="yaml",
     # Path transformer to organize cassettes
-    path_transformer=vcr.VCR.ensure_suffix('.yaml'),
+    path_transformer=vcr.VCR.ensure_suffix(".yaml"),
 )
 
 

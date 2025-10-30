@@ -4,10 +4,12 @@ Tests for nadlan_mcp.govmap.statistics module.
 Comprehensive tests for statistical calculation functions.
 """
 
-import pytest
 from datetime import date
-from nadlan_mcp.govmap.statistics import calculate_deal_statistics, calculate_std_dev
+
+import pytest
+
 from nadlan_mcp.govmap.models import Deal, DealStatistics
+from nadlan_mcp.govmap.statistics import calculate_deal_statistics, calculate_std_dev
 
 
 class TestCalculateDealStatistics:
@@ -135,8 +137,12 @@ class TestCalculateDealStatistics:
         """Test statistics when some deals have zero prices."""
         deals = [
             Deal(objectid=1, deal_amount=1000000.0, deal_date="2024-01-01", asset_area=80.0),
-            Deal(objectid=2, deal_amount=0.0, deal_date="2024-01-02", asset_area=100.0),  # Zero price excluded
-            Deal(objectid=3, deal_amount=-1.0, deal_date="2024-01-03", asset_area=120.0),  # Negative excluded
+            Deal(
+                objectid=2, deal_amount=0.0, deal_date="2024-01-02", asset_area=100.0
+            ),  # Zero price excluded
+            Deal(
+                objectid=3, deal_amount=-1.0, deal_date="2024-01-03", asset_area=120.0
+            ),  # Negative excluded
         ]
         stats = calculate_deal_statistics(deals)
 
@@ -161,8 +167,18 @@ class TestCalculateDealStatistics:
     def test_deals_with_missing_property_types(self):
         """Test statistics when some deals have missing property types."""
         deals = [
-            Deal(objectid=1, deal_amount=1000000.0, deal_date="2024-01-01", property_type_description="דירה"),
-            Deal(objectid=2, deal_amount=1500000.0, deal_date="2024-01-02", property_type_description=None),
+            Deal(
+                objectid=1,
+                deal_amount=1000000.0,
+                deal_date="2024-01-01",
+                property_type_description="דירה",
+            ),
+            Deal(
+                objectid=2,
+                deal_amount=1500000.0,
+                deal_date="2024-01-02",
+                property_type_description=None,
+            ),
             Deal(objectid=3, deal_amount=2000000.0, deal_date="2024-01-03"),  # No property_type
         ]
         stats = calculate_deal_statistics(deals)
@@ -196,7 +212,13 @@ class TestCalculateDealStatistics:
     def test_single_deal(self):
         """Test statistics with single deal."""
         deals = [
-            Deal(objectid=1, deal_amount=1000000.0, deal_date="2024-01-01", asset_area=80.0, property_type_description="דירה")
+            Deal(
+                objectid=1,
+                deal_amount=1000000.0,
+                deal_date="2024-01-01",
+                asset_area=80.0,
+                property_type_description="דירה",
+            )
         ]
         stats = calculate_deal_statistics(deals)
 
@@ -238,8 +260,18 @@ class TestCalculateDealStatistics:
     def test_date_handling_with_iso_strings(self):
         """Test date range calculation with ISO format strings."""
         deals = [
-            Deal(objectid=1, deal_amount=1000000.0, deal_date="2024-01-15T00:00:00.000Z", asset_area=80.0),
-            Deal(objectid=2, deal_amount=1500000.0, deal_date="2024-02-01T12:30:45.123Z", asset_area=100.0),
+            Deal(
+                objectid=1,
+                deal_amount=1000000.0,
+                deal_date="2024-01-15T00:00:00.000Z",
+                asset_area=80.0,
+            ),
+            Deal(
+                objectid=2,
+                deal_amount=1500000.0,
+                deal_date="2024-02-01T12:30:45.123Z",
+                asset_area=100.0,
+            ),
         ]
         stats = calculate_deal_statistics(deals)
 
@@ -250,9 +282,24 @@ class TestCalculateDealStatistics:
     def test_multiple_same_property_types(self):
         """Test property type distribution with duplicates."""
         deals = [
-            Deal(objectid=1, deal_amount=1000000.0, deal_date="2024-01-01", property_type_description="דירה"),
-            Deal(objectid=2, deal_amount=1500000.0, deal_date="2024-01-02", property_type_description="דירה"),
-            Deal(objectid=3, deal_amount=2000000.0, deal_date="2024-01-03", property_type_description="דירה"),
+            Deal(
+                objectid=1,
+                deal_amount=1000000.0,
+                deal_date="2024-01-01",
+                property_type_description="דירה",
+            ),
+            Deal(
+                objectid=2,
+                deal_amount=1500000.0,
+                deal_date="2024-01-02",
+                property_type_description="דירה",
+            ),
+            Deal(
+                objectid=3,
+                deal_amount=2000000.0,
+                deal_date="2024-01-03",
+                property_type_description="דירה",
+            ),
         ]
         stats = calculate_deal_statistics(deals)
 
@@ -289,7 +336,7 @@ class TestCalculateDealStatistics:
                 Deal(
                     objectid=i,
                     deal_amount=1000000.0 if has_price else 0.0,  # Use 0.0 instead of None
-                    deal_date=f"2024-01-{i+1:02d}",
+                    deal_date=f"2024-01-{i + 1:02d}",
                     asset_area=80.0 if has_area else None,
                 )
             )

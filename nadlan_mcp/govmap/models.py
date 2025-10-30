@@ -8,7 +8,8 @@ and type safety throughout the codebase.
 
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field, field_validator, computed_field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 
 class CoordinatePoint(BaseModel):
@@ -19,6 +20,7 @@ class CoordinatePoint(BaseModel):
         longitude: X coordinate in ITM projection (meters)
         latitude: Y coordinate in ITM projection (meters)
     """
+
     longitude: float = Field(..., description="X coordinate in ITM projection (meters)")
     latitude: float = Field(..., description="Y coordinate in ITM projection (meters)")
 
@@ -36,6 +38,7 @@ class Address(BaseModel):
         score: Relevance score from autocomplete
         coordinates: ITM coordinate point
     """
+
     text: str = Field(..., description="Full address text")
     id: str = Field(..., description="Unique address identifier")
     type: str = Field(..., description="Address type")
@@ -55,6 +58,7 @@ class AutocompleteResult(BaseModel):
         coordinates: Optional coordinate point
         shape: Original WKT shape string from API
     """
+
     text: str
     id: str
     type: str
@@ -71,6 +75,7 @@ class AutocompleteResponse(BaseModel):
         results_count: Number of results returned
         results: List of autocomplete results
     """
+
     results_count: int = Field(alias="resultsCount")
     results: List[AutocompleteResult] = Field(default_factory=list)
 
@@ -102,6 +107,7 @@ class Deal(BaseModel):
         source_polygon_id: Source polygon ID
         sourceorder: Source ordering
     """
+
     # Required fields
     objectid: int = Field(..., description="Unique deal identifier")
     deal_amount: float = Field(..., alias="dealAmount", description="Transaction amount in NIS")
@@ -109,30 +115,40 @@ class Deal(BaseModel):
 
     # Common optional fields
     asset_area: Optional[float] = Field(None, alias="assetArea", description="Property area in sqm")
-    settlement_name_heb: Optional[str] = Field(None, alias="settlementNameHeb", description="City name in Hebrew")
-    property_type_description: Optional[str] = Field(None, alias="propertyTypeDescription", description="Property type")
+    settlement_name_heb: Optional[str] = Field(
+        None, alias="settlementNameHeb", description="City name in Hebrew"
+    )
+    property_type_description: Optional[str] = Field(
+        None, alias="propertyTypeDescription", description="Property type"
+    )
     neighborhood: Optional[str] = Field(None, description="Neighborhood name")
     street_name: Optional[str] = Field(None, alias="streetName", description="Street name")
     house_number: Optional[str] = Field(None, alias="houseNumber", description="House number")
 
     # Floor information
     floor: Optional[str] = Field(None, description="Floor description (may be Hebrew)")
-    floor_number: Optional[int] = Field(None, alias="floorNumber", description="Numeric floor number")
+    floor_number: Optional[int] = Field(
+        None, alias="floorNumber", description="Numeric floor number"
+    )
 
     # Additional details
     rooms: Optional[float] = Field(None, description="Number of rooms")
 
     # Priority and metadata (added by our system, not from API)
-    priority: Optional[int] = Field(None, description="Priority for sorting (0=same building, 1=street, 2=neighborhood)")
+    priority: Optional[int] = Field(
+        None, description="Priority for sorting (0=same building, 1=street, 2=neighborhood)"
+    )
 
     # Geometry and internal fields (often not useful for analysis)
     shape: Optional[str] = Field(None, description="WKT geometry")
-    source_polygon_id: Optional[str] = Field(None, alias="sourcePolygonId", description="Source polygon ID")
+    source_polygon_id: Optional[str] = Field(
+        None, alias="sourcePolygonId", description="Source polygon ID"
+    )
     sourceorder: Optional[int] = Field(None, description="Source ordering")
 
     model_config = ConfigDict(
         populate_by_name=True,  # Allow both alias and field name
-        extra='allow'  # Allow extra fields from API that we don't model
+        extra="allow",  # Allow extra fields from API that we don't model
     )
 
     @computed_field
@@ -148,7 +164,7 @@ class Deal(BaseModel):
             return round(self.deal_amount / self.asset_area, 2)
         return None
 
-    @field_validator('deal_date', mode='before')
+    @field_validator("deal_date", mode="before")
     @classmethod
     def parse_deal_date(cls, v: Any) -> date:
         """Parse deal date string into a date object."""
@@ -158,8 +174,8 @@ class Deal(BaseModel):
             return v.date()
         if isinstance(v, str):
             # Handle ISO format with optional time and timezone
-            if 'T' in v:
-                v = v.split('T')[0]
+            if "T" in v:
+                v = v.split("T")[0]
             try:
                 return date.fromisoformat(v)
             except ValueError:
@@ -179,37 +195,32 @@ class DealStatistics(BaseModel):
         property_type_distribution: Count by property type
         date_range: Earliest and latest deal dates
     """
+
     total_deals: int = Field(..., description="Total number of deals analyzed")
 
     # Price statistics
     price_statistics: Dict[str, float] = Field(
         default_factory=dict,
-        description="Price stats (mean, median, std_dev, min, max, percentiles)"
+        description="Price stats (mean, median, std_dev, min, max, percentiles)",
     )
 
     # Area statistics
     area_statistics: Dict[str, float] = Field(
-        default_factory=dict,
-        description="Area stats (mean, median, std_dev, min, max)"
+        default_factory=dict, description="Area stats (mean, median, std_dev, min, max)"
     )
 
     # Price per sqm statistics
     price_per_sqm_statistics: Dict[str, float] = Field(
-        default_factory=dict,
-        description="Price/sqm stats (mean, median, std_dev, min, max)"
+        default_factory=dict, description="Price/sqm stats (mean, median, std_dev, min, max)"
     )
 
     # Distribution by property type
     property_type_distribution: Dict[str, int] = Field(
-        default_factory=dict,
-        description="Count of deals by property type"
+        default_factory=dict, description="Count of deals by property type"
     )
 
     # Date range
-    date_range: Optional[Dict[str, str]] = Field(
-        None,
-        description="Earliest and latest deal dates"
-    )
+    date_range: Optional[Dict[str, str]] = Field(None, description="Earliest and latest deal dates")
 
 
 class MarketActivityScore(BaseModel):
@@ -224,14 +235,16 @@ class MarketActivityScore(BaseModel):
         time_period_months: Analysis period in months
         monthly_distribution: Deals per month breakdown
     """
+
     activity_score: float = Field(..., description="Overall activity score (0-100)", ge=0, le=100)
     total_deals: int = Field(..., description="Total deals in period")
     deals_per_month: float = Field(..., description="Average deals per month")
     trend: str = Field(..., description="Market trend (increasing, stable, decreasing)")
-    time_period_months: Optional[int] = Field(None, description="Analysis period in months (None = all data)")
+    time_period_months: Optional[int] = Field(
+        None, description="Analysis period in months (None = all data)"
+    )
     monthly_distribution: Dict[str, int] = Field(
-        default_factory=dict,
-        description="Deals per month (YYYY-MM: count)"
+        default_factory=dict, description="Deals per month (YYYY-MM: count)"
     )
 
 
@@ -250,7 +263,10 @@ class InvestmentAnalysis(BaseModel):
         total_deals: Total deals analyzed (sample size)
         data_quality: Data quality assessment
     """
-    investment_score: float = Field(..., description="Overall investment score (0-100)", ge=0, le=100)
+
+    investment_score: float = Field(
+        ..., description="Overall investment score (0-100)", ge=0, le=100
+    )
     price_trend: str = Field(..., description="Price trend (increasing, stable, decreasing)")
     price_appreciation_rate: float = Field(..., description="Annual price growth rate (%)")
     price_volatility: float = Field(..., description="Price volatility score (0-100)", ge=0, le=100)
@@ -273,12 +289,17 @@ class LiquidityMetrics(BaseModel):
         liquidity_rating: Market liquidity rating
         trend_direction: Liquidity trend direction
     """
+
     liquidity_score: float = Field(..., description="Overall liquidity score (0-100)", ge=0, le=100)
     total_deals: int = Field(..., description="Total deals in period")
-    time_period_months: Optional[int] = Field(None, description="Analysis period in months (None = all data)")
+    time_period_months: Optional[int] = Field(
+        None, description="Analysis period in months (None = all data)"
+    )
     avg_deals_per_month: float = Field(..., description="Average deals per month")
     deal_velocity: float = Field(..., description="Deal velocity (deals per month)")
-    market_activity_level: str = Field(..., description="Activity level (very_high, high, moderate, low, very_low)")
+    market_activity_level: str = Field(
+        ..., description="Activity level (very_high, high, moderate, low, very_low)"
+    )
 
 
 class DealFilters(BaseModel):
@@ -298,6 +319,7 @@ class DealFilters(BaseModel):
         min_floor: Minimum floor number
         max_floor: Maximum floor number
     """
+
     property_type: Optional[str] = Field(None, description="Property type filter")
     min_rooms: Optional[float] = Field(None, description="Minimum rooms", ge=0)
     max_rooms: Optional[float] = Field(None, description="Maximum rooms", ge=0)
@@ -308,38 +330,38 @@ class DealFilters(BaseModel):
     min_floor: Optional[int] = Field(None, description="Minimum floor")
     max_floor: Optional[int] = Field(None, description="Maximum floor")
 
-    @field_validator('max_rooms')
+    @field_validator("max_rooms")
     @classmethod
     def validate_max_rooms(cls, v: Optional[float], info) -> Optional[float]:
         """Ensure max_rooms >= min_rooms if both specified."""
-        if v is not None and info.data.get('min_rooms') is not None:
-            if v < info.data['min_rooms']:
+        if v is not None and info.data.get("min_rooms") is not None:
+            if v < info.data["min_rooms"]:
                 raise ValueError("max_rooms must be >= min_rooms")
         return v
 
-    @field_validator('max_price')
+    @field_validator("max_price")
     @classmethod
     def validate_max_price(cls, v: Optional[float], info) -> Optional[float]:
         """Ensure max_price >= min_price if both specified."""
-        if v is not None and info.data.get('min_price') is not None:
-            if v < info.data['min_price']:
+        if v is not None and info.data.get("min_price") is not None:
+            if v < info.data["min_price"]:
                 raise ValueError("max_price must be >= min_price")
         return v
 
-    @field_validator('max_area')
+    @field_validator("max_area")
     @classmethod
     def validate_max_area(cls, v: Optional[float], info) -> Optional[float]:
         """Ensure max_area >= min_area if both specified."""
-        if v is not None and info.data.get('min_area') is not None:
-            if v < info.data['min_area']:
+        if v is not None and info.data.get("min_area") is not None:
+            if v < info.data["min_area"]:
                 raise ValueError("max_area must be >= min_area")
         return v
 
-    @field_validator('max_floor')
+    @field_validator("max_floor")
     @classmethod
     def validate_max_floor(cls, v: Optional[int], info) -> Optional[int]:
         """Ensure max_floor >= min_floor if both specified."""
-        if v is not None and info.data.get('min_floor') is not None:
-            if v < info.data['min_floor']:
+        if v is not None and info.data.get("min_floor") is not None:
+            if v < info.data["min_floor"]:
                 raise ValueError("max_floor must be >= min_floor")
         return v

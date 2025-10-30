@@ -137,7 +137,7 @@ async def main():
         # List available tools
         result = await client.list_tools()
         print("Available tools:", result.tools)
-        
+
         # Call a tool
         result = await client.call_tool("find_recent_deals_for_address", {
             "address": "סוקולוב 38 חולון",
@@ -164,7 +164,7 @@ asyncio.run(main())
 ##### 🏠 `find_recent_deals_for_address`
 **Main comprehensive analysis tool**
 - **Description**: Find all relevant real estate deals for a given address
-- **Parameters**: 
+- **Parameters**:
   - `address` (required): The address to search for (Hebrew or English)
   - `years_back` (optional): Number of years to look back (default: 2)
 - **Returns**: List of deals with detailed information
@@ -339,9 +339,9 @@ for deal in deals:
 # Get detailed street deals for a specific polygon
 polygon_id = "52190246"
 street_deals = client.get_street_deals(
-    polygon_id, 
-    limit=10, 
-    start_date="2023-01", 
+    polygon_id,
+    limit=10,
+    start_date="2023-01",
     end_date="2024-01"
 )
 

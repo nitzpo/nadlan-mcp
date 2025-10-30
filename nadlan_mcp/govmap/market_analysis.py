@@ -5,12 +5,12 @@ This module provides functions for analyzing market trends, activity, and invest
 Focused on providing data metrics; the LLM interprets them for investment advice.
 """
 
-import logging
 from collections import defaultdict
 from datetime import date, datetime, timedelta
+import logging
 from typing import Dict, List, Optional, Tuple
 
-from .models import Deal, MarketActivityScore, InvestmentAnalysis, LiquidityMetrics
+from .models import Deal, InvestmentAnalysis, LiquidityMetrics, MarketActivityScore
 from .statistics import calculate_std_dev
 
 logger = logging.getLogger(__name__)
@@ -73,7 +73,11 @@ def parse_deal_dates(
 
         try:
             # Convert date to string for comparison and parsing
-            date_str = deal.deal_date.isoformat() if isinstance(deal.deal_date, date) else str(deal.deal_date)
+            date_str = (
+                deal.deal_date.isoformat()
+                if isinstance(deal.deal_date, date)
+                else str(deal.deal_date)
+            )
 
             # Filter by time period if specified
             if cutoff_date is not None and date_str < cutoff_date_str:
@@ -141,11 +145,27 @@ def calculate_market_activity_score(
     if deals_per_month >= ACTIVITY_VERY_HIGH_THRESHOLD:
         activity_score = 100
     elif deals_per_month >= ACTIVITY_HIGH_THRESHOLD:
-        activity_score = 75 + ((deals_per_month - ACTIVITY_HIGH_THRESHOLD) / ACTIVITY_HIGH_THRESHOLD) * 25
+        activity_score = (
+            75 + ((deals_per_month - ACTIVITY_HIGH_THRESHOLD) / ACTIVITY_HIGH_THRESHOLD) * 25
+        )
     elif deals_per_month >= ACTIVITY_MODERATE_THRESHOLD:
-        activity_score = 50 + ((deals_per_month - ACTIVITY_MODERATE_THRESHOLD) / (ACTIVITY_HIGH_THRESHOLD - ACTIVITY_MODERATE_THRESHOLD)) * 25
+        activity_score = (
+            50
+            + (
+                (deals_per_month - ACTIVITY_MODERATE_THRESHOLD)
+                / (ACTIVITY_HIGH_THRESHOLD - ACTIVITY_MODERATE_THRESHOLD)
+            )
+            * 25
+        )
     elif deals_per_month >= ACTIVITY_LOW_THRESHOLD:
-        activity_score = 25 + ((deals_per_month - ACTIVITY_LOW_THRESHOLD) / (ACTIVITY_MODERATE_THRESHOLD - ACTIVITY_LOW_THRESHOLD)) * 25
+        activity_score = (
+            25
+            + (
+                (deals_per_month - ACTIVITY_LOW_THRESHOLD)
+                / (ACTIVITY_MODERATE_THRESHOLD - ACTIVITY_LOW_THRESHOLD)
+            )
+            * 25
+        )
     else:
         activity_score = deals_per_month * 25
 
@@ -158,7 +178,9 @@ def calculate_market_activity_score(
             len(sorted_months) - mid_point
         )
 
-        change_ratio = (second_half_avg - first_half_avg) / first_half_avg if first_half_avg > 0 else 0
+        change_ratio = (
+            (second_half_avg - first_half_avg) / first_half_avg if first_half_avg > 0 else 0
+        )
 
         if change_ratio > 0.15:
             trend = "increasing"
@@ -215,7 +237,11 @@ def analyze_investment_potential(deals: List[Deal]) -> InvestmentAnalysis:
         if price_per_sqm and price_per_sqm > 0 and deal.deal_date:
             try:
                 # Convert date to string for parsing
-                date_str = deal.deal_date.isoformat() if isinstance(deal.deal_date, date) else str(deal.deal_date)
+                date_str = (
+                    deal.deal_date.isoformat()
+                    if isinstance(deal.deal_date, date)
+                    else str(deal.deal_date)
+                )
 
                 # Parse date for sorting
                 year = int(date_str[:4])
@@ -279,13 +305,34 @@ def analyze_investment_potential(deals: List[Deal]) -> InvestmentAnalysis:
         volatility_score = 100
         market_stability = "very_volatile"
     elif coefficient_of_variation > VOLATILITY_VOLATILE_THRESHOLD:
-        volatility_score = 75 + ((coefficient_of_variation - VOLATILITY_VOLATILE_THRESHOLD) / (VOLATILITY_VERY_VOLATILE_THRESHOLD - VOLATILITY_VOLATILE_THRESHOLD)) * 25
+        volatility_score = (
+            75
+            + (
+                (coefficient_of_variation - VOLATILITY_VOLATILE_THRESHOLD)
+                / (VOLATILITY_VERY_VOLATILE_THRESHOLD - VOLATILITY_VOLATILE_THRESHOLD)
+            )
+            * 25
+        )
         market_stability = "volatile"
     elif coefficient_of_variation > VOLATILITY_MODERATE_THRESHOLD:
-        volatility_score = 50 + ((coefficient_of_variation - VOLATILITY_MODERATE_THRESHOLD) / (VOLATILITY_VOLATILE_THRESHOLD - VOLATILITY_MODERATE_THRESHOLD)) * 25
+        volatility_score = (
+            50
+            + (
+                (coefficient_of_variation - VOLATILITY_MODERATE_THRESHOLD)
+                / (VOLATILITY_VOLATILE_THRESHOLD - VOLATILITY_MODERATE_THRESHOLD)
+            )
+            * 25
+        )
         market_stability = "moderate"
     elif coefficient_of_variation > VOLATILITY_STABLE_THRESHOLD:
-        volatility_score = 25 + ((coefficient_of_variation - VOLATILITY_STABLE_THRESHOLD) / (VOLATILITY_MODERATE_THRESHOLD - VOLATILITY_STABLE_THRESHOLD)) * 25
+        volatility_score = (
+            25
+            + (
+                (coefficient_of_variation - VOLATILITY_STABLE_THRESHOLD)
+                / (VOLATILITY_MODERATE_THRESHOLD - VOLATILITY_STABLE_THRESHOLD)
+            )
+            * 25
+        )
         market_stability = "stable"
     else:
         volatility_score = (coefficient_of_variation / VOLATILITY_STABLE_THRESHOLD) * 25
@@ -358,10 +405,8 @@ def get_market_liquidity(
     # Calculate metrics
     total_deals = len(deal_dates)
     unique_months = len(monthly_deals)
-    unique_quarters = len(quarterly_deals)
 
     deals_per_month = total_deals / unique_months if unique_months > 0 else 0
-    deals_per_quarter = total_deals / unique_quarters if unique_quarters > 0 else 0
 
     # Calculate velocity score (similar to activity score but focused on turnover)
     # Based on monthly deal velocity using defined thresholds
@@ -369,13 +414,34 @@ def get_market_liquidity(
         velocity_score = 100
         liquidity_rating = "very_high"
     elif deals_per_month >= LIQUIDITY_HIGH_THRESHOLD:
-        velocity_score = 75 + ((deals_per_month - LIQUIDITY_HIGH_THRESHOLD) / (LIQUIDITY_VERY_HIGH_THRESHOLD - LIQUIDITY_HIGH_THRESHOLD)) * 25
+        velocity_score = (
+            75
+            + (
+                (deals_per_month - LIQUIDITY_HIGH_THRESHOLD)
+                / (LIQUIDITY_VERY_HIGH_THRESHOLD - LIQUIDITY_HIGH_THRESHOLD)
+            )
+            * 25
+        )
         liquidity_rating = "high"
     elif deals_per_month >= LIQUIDITY_MODERATE_THRESHOLD:
-        velocity_score = 50 + ((deals_per_month - LIQUIDITY_MODERATE_THRESHOLD) / (LIQUIDITY_HIGH_THRESHOLD - LIQUIDITY_MODERATE_THRESHOLD)) * 25
+        velocity_score = (
+            50
+            + (
+                (deals_per_month - LIQUIDITY_MODERATE_THRESHOLD)
+                / (LIQUIDITY_HIGH_THRESHOLD - LIQUIDITY_MODERATE_THRESHOLD)
+            )
+            * 25
+        )
         liquidity_rating = "moderate"
     elif deals_per_month >= LIQUIDITY_LOW_THRESHOLD:
-        velocity_score = 25 + ((deals_per_month - LIQUIDITY_LOW_THRESHOLD) / (LIQUIDITY_MODERATE_THRESHOLD - LIQUIDITY_LOW_THRESHOLD)) * 25
+        velocity_score = (
+            25
+            + (
+                (deals_per_month - LIQUIDITY_LOW_THRESHOLD)
+                / (LIQUIDITY_MODERATE_THRESHOLD - LIQUIDITY_LOW_THRESHOLD)
+            )
+            * 25
+        )
         liquidity_rating = "low"
     else:
         velocity_score = deals_per_month * 50
@@ -405,4 +471,5 @@ def get_market_liquidity(
         avg_deals_per_month=round(deals_per_month, 2),
         deal_velocity=round(deals_per_month, 2),
         market_activity_level=liquidity_rating,
+        trend_direction=trend_direction,
     )

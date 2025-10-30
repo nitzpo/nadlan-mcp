@@ -94,9 +94,12 @@ def filter_deals_by_criteria(
             # Handle Hebrew feminine ending variations (ה ↔ ת)
             # If the filter term ends with ה, also check for the ת variant
             # This allows "דירה" to match "דירת גג", "דירה בבניין", etc.
-            if property_type_normalized.endswith('ה'):
-                property_type_variant = property_type_normalized[:-1] + 'ת'
-                if property_type_variant not in deal_type_normalized and property_type_normalized not in deal_type_normalized:
+            if property_type_normalized.endswith("ה"):
+                property_type_variant = property_type_normalized[:-1] + "ת"
+                if (
+                    property_type_variant not in deal_type_normalized
+                    and property_type_normalized not in deal_type_normalized
+                ):
                     # No match found for either variant
                     continue
             else:

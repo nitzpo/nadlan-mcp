@@ -5,21 +5,20 @@ This module tests all Pydantic model validation, serialization,
 and computed fields to ensure type safety and correctness.
 """
 
-import pytest
-from datetime import datetime
 from pydantic import ValidationError
+import pytest
 
 from nadlan_mcp.govmap.models import (
-    CoordinatePoint,
     Address,
-    AutocompleteResult,
     AutocompleteResponse,
+    AutocompleteResult,
+    CoordinatePoint,
     Deal,
+    DealFilters,
     DealStatistics,
-    MarketActivityScore,
     InvestmentAnalysis,
     LiquidityMetrics,
-    DealFilters,
+    MarketActivityScore,
 )
 
 
@@ -51,11 +50,7 @@ class TestAddress:
         """Test creating valid address."""
         coord = CoordinatePoint(longitude=180000.0, latitude=650000.0)
         address = Address(
-            text="סוקולוב 38 חולון",
-            id="addr123",
-            type="address",
-            score=95.5,
-            coordinates=coord
+            text="סוקולוב 38 חולון", id="addr123", type="address", score=95.5, coordinates=coord
         )
         assert address.text == "סוקולוב 38 חולון"
         assert address.score == 95.5
@@ -63,11 +58,7 @@ class TestAddress:
 
     def test_address_without_coordinates(self):
         """Test creating address without coordinates."""
-        address = Address(
-            text="סוקולוב 38 חולון",
-            id="addr123",
-            type="address"
-        )
+        address = Address(text="סוקולוב 38 חולון", id="addr123", type="address")
         assert address.coordinates is None
         assert address.score == 0  # Default value
 
@@ -84,7 +75,7 @@ class TestAutocompleteResult:
             type="city",
             score=100.0,
             coordinates=coord,
-            shape="POINT(180000.0 650000.0)"
+            shape="POINT(180000.0 650000.0)",
         )
         assert result.text == "חולון"
         assert result.coordinates.longitude == 180000.0
@@ -92,11 +83,7 @@ class TestAutocompleteResult:
 
     def test_result_without_shape(self):
         """Test result without shape data."""
-        result = AutocompleteResult(
-            text="חולון",
-            id="city123",
-            type="city"
-        )
+        result = AutocompleteResult(text="חולון", id="city123", type="city")
         assert result.shape is None
         assert result.coordinates is None
 
@@ -108,7 +95,7 @@ class TestAutocompleteResponse:
         """Test creating valid autocomplete response."""
         results = [
             AutocompleteResult(text="חולון", id="city1", type="city"),
-            AutocompleteResult(text="חולון סוקולוב", id="street1", type="street")
+            AutocompleteResult(text="חולון סוקולוב", id="street1", type="street"),
         ]
         response = AutocompleteResponse(resultsCount=2, results=results)
         assert response.results_count == 2
@@ -116,10 +103,7 @@ class TestAutocompleteResponse:
 
     def test_response_with_alias(self):
         """Test that camelCase alias works."""
-        response = AutocompleteResponse.model_validate({
-            "resultsCount": 5,
-            "results": []
-        })
+        response = AutocompleteResponse.model_validate({"resultsCount": 5, "results": []})
         assert response.results_count == 5
 
     def test_empty_response(self):
@@ -143,7 +127,7 @@ class TestDeal:
             property_type_description="דירה",
             street_name="סוקולוב",
             house_number="38",
-            rooms=3.5
+            rooms=3.5,
         )
         assert deal.objectid == 12345
         assert deal.deal_amount == 1500000.0
@@ -151,43 +135,31 @@ class TestDeal:
 
     def test_deal_with_aliases(self):
         """Test creating deal using API camelCase field names."""
-        deal = Deal.model_validate({
-            "objectid": 12345,
-            "dealAmount": 1500000.0,
-            "dealDate": "2024-01-15",
-            "assetArea": 85.0,
-            "propertyTypeDescription": "דירה"
-        })
+        deal = Deal.model_validate(
+            {
+                "objectid": 12345,
+                "dealAmount": 1500000.0,
+                "dealDate": "2024-01-15",
+                "assetArea": 85.0,
+                "propertyTypeDescription": "דירה",
+            }
+        )
         assert deal.deal_amount == 1500000.0
         assert deal.property_type_description == "דירה"
 
     def test_deal_price_per_sqm_computed(self):
         """Test price_per_sqm computed field."""
-        deal = Deal(
-            objectid=12345,
-            deal_amount=1500000.0,
-            deal_date="2024-01-15",
-            asset_area=85.0
-        )
+        deal = Deal(objectid=12345, deal_amount=1500000.0, deal_date="2024-01-15", asset_area=85.0)
         assert deal.price_per_sqm == round(1500000.0 / 85.0, 2)
 
     def test_deal_price_per_sqm_no_area(self):
         """Test price_per_sqm returns None when area is missing."""
-        deal = Deal(
-            objectid=12345,
-            deal_amount=1500000.0,
-            deal_date="2024-01-15"
-        )
+        deal = Deal(objectid=12345, deal_amount=1500000.0, deal_date="2024-01-15")
         assert deal.price_per_sqm is None
 
     def test_deal_price_per_sqm_zero_area(self):
         """Test price_per_sqm returns None when area is zero."""
-        deal = Deal(
-            objectid=12345,
-            deal_amount=1500000.0,
-            deal_date="2024-01-15",
-            asset_area=0.0
-        )
+        deal = Deal(objectid=12345, deal_amount=1500000.0, deal_date="2024-01-15", asset_area=0.0)
         assert deal.price_per_sqm is None
 
     def test_deal_extra_fields_allowed(self):
@@ -197,7 +169,7 @@ class TestDeal:
             "dealAmount": 1500000.0,
             "dealDate": "2024-01-15",
             "extra_field": "extra_value",
-            "another_field": 123
+            "another_field": 123,
         }
         deal = Deal.model_validate(deal_data)
         # Extra fields should be stored
@@ -205,12 +177,7 @@ class TestDeal:
 
     def test_deal_serialization(self):
         """Test deal serialization to dict."""
-        deal = Deal(
-            objectid=12345,
-            deal_amount=1500000.0,
-            deal_date="2024-01-15",
-            asset_area=85.0
-        )
+        deal = Deal(objectid=12345, deal_amount=1500000.0, deal_date="2024-01-15", asset_area=85.0)
         deal_dict = deal.model_dump()
         assert deal_dict["objectid"] == 12345
         assert deal_dict["deal_amount"] == 1500000.0
@@ -218,11 +185,7 @@ class TestDeal:
 
     def test_deal_serialization_exclude_none(self):
         """Test deal serialization excluding None values."""
-        deal = Deal(
-            objectid=12345,
-            deal_amount=1500000.0,
-            deal_date="2024-01-15"
-        )
+        deal = Deal(objectid=12345, deal_amount=1500000.0, deal_date="2024-01-15")
         deal_dict = deal.model_dump(exclude_none=True)
         assert "asset_area" not in deal_dict
         assert "rooms" not in deal_dict
@@ -240,28 +203,11 @@ class TestDealStatistics:
         """Test creating valid deal statistics."""
         stats = DealStatistics(
             total_deals=100,
-            price_statistics={
-                "mean": 1500000.0,
-                "median": 1400000.0,
-                "std_dev": 200000.0
-            },
-            area_statistics={
-                "mean": 85.5,
-                "median": 82.0
-            },
-            price_per_sqm_statistics={
-                "mean": 17500.0,
-                "median": 17200.0
-            },
-            property_type_distribution={
-                "דירה": 80,
-                "דירת גן": 15,
-                "פנטהאוז": 5
-            },
-            date_range={
-                "earliest": "2022-01-01",
-                "latest": "2024-12-31"
-            }
+            price_statistics={"mean": 1500000.0, "median": 1400000.0, "std_dev": 200000.0},
+            area_statistics={"mean": 85.5, "median": 82.0},
+            price_per_sqm_statistics={"mean": 17500.0, "median": 17200.0},
+            property_type_distribution={"דירה": 80, "דירת גן": 15, "פנטהאוז": 5},
+            date_range={"earliest": "2022-01-01", "latest": "2024-12-31"},
         )
         assert stats.total_deals == 100
         assert stats.price_statistics["mean"] == 1500000.0
@@ -286,7 +232,7 @@ class TestMarketActivityScore:
             deals_per_month=10.0,
             trend="increasing",
             time_period_months=12,
-            monthly_distribution={"2024-01": 8, "2024-02": 12}
+            monthly_distribution={"2024-01": 8, "2024-02": 12},
         )
         assert score.activity_score == 75.5
         assert score.trend == "increasing"
@@ -300,7 +246,7 @@ class TestMarketActivityScore:
                 total_deals=100,
                 deals_per_month=8.0,
                 trend="stable",
-                time_period_months=12
+                time_period_months=12,
             )
 
         with pytest.raises(ValidationError):
@@ -309,7 +255,7 @@ class TestMarketActivityScore:
                 total_deals=100,
                 deals_per_month=8.0,
                 trend="stable",
-                time_period_months=12
+                time_period_months=12,
             )
 
 
@@ -327,7 +273,7 @@ class TestInvestmentAnalysis:
             avg_price_per_sqm=17500.0,
             price_change_pct=12.5,
             total_deals=85,
-            data_quality="good"
+            data_quality="good",
         )
         assert analysis.investment_score == 68.5
         assert analysis.price_trend == "increasing"
@@ -345,7 +291,7 @@ class TestInvestmentAnalysis:
                 avg_price_per_sqm=17000.0,
                 price_change_pct=5.0,
                 total_deals=100,
-                data_quality="excellent"
+                data_quality="excellent",
             )
 
 
@@ -360,7 +306,7 @@ class TestLiquidityMetrics:
             time_period_months=12,
             avg_deals_per_month=12.5,
             deal_velocity=12.5,
-            market_activity_level="high"
+            market_activity_level="high",
         )
         assert metrics.liquidity_score == 82.3
         assert metrics.market_activity_level == "high"
@@ -381,7 +327,7 @@ class TestDealFilters:
             min_area=60.0,
             max_area=100.0,
             min_floor=1,
-            max_floor=5
+            max_floor=5,
         )
         assert filters.property_type == "דירה"
         assert filters.min_rooms == 2.0
@@ -425,45 +371,42 @@ class TestDealFilters:
 class TestModelIntegration:
     """Integration tests for models working together."""
 
-    def test_deal_to_statistics_workflow(self):  
-        """Test creating deals and calculating statistics."""  
-        # Import the function to test integration  
-        from nadlan_mcp.govmap.statistics import calculate_deal_statistics  
+    def test_deal_to_statistics_workflow(self):
+        """Test creating deals and calculating statistics."""
+        # Import the function to test integration
+        from nadlan_mcp.govmap.statistics import calculate_deal_statistics
 
-        deals = [  
-            Deal(  
-                objectid=1,  
-                deal_amount=1000000.0,  
-                deal_date="2024-01-01",  
-                asset_area=100.0,  
-                property_type_description="דירה"  
-            ),  
-            Deal(  
-                objectid=2,  
-                deal_amount=2000000.0,  
-                deal_date="2024-01-02",  
-                asset_area=100.0,  
-                property_type_description="דירה"  
-            ),  
-        ]  
+        deals = [
+            Deal(
+                objectid=1,
+                deal_amount=1000000.0,
+                deal_date="2024-01-01",
+                asset_area=100.0,
+                property_type_description="דירה",
+            ),
+            Deal(
+                objectid=2,
+                deal_amount=2000000.0,
+                deal_date="2024-01-02",
+                asset_area=100.0,
+                property_type_description="דירה",
+            ),
+        ]
 
-        stats = calculate_deal_statistics(deals)  
+        stats = calculate_deal_statistics(deals)
 
-        assert isinstance(stats, DealStatistics)  
-        assert stats.total_deals == 2  
-        assert stats.price_statistics["mean"] == 1500000.0  
-        assert stats.price_per_sqm_statistics["mean"] == 15000.0  
-        assert stats.property_type_distribution["דירה"] == 2 
+        assert isinstance(stats, DealStatistics)
+        assert stats.total_deals == 2
+        assert stats.price_statistics["mean"] == 1500000.0
+        assert stats.price_per_sqm_statistics["mean"] == 15000.0
+        assert stats.property_type_distribution["דירה"] == 2
 
     def test_autocomplete_to_deals_workflow(self):
         """Test autocomplete response leading to deal search."""
         # Simulate autocomplete response
         coord = CoordinatePoint(longitude=180000.0, latitude=650000.0)
         result = AutocompleteResult(
-            text="סוקולוב 38 חולון",
-            id="addr123",
-            type="address",
-            coordinates=coord
+            text="סוקולוב 38 חולון", id="addr123", type="address", coordinates=coord
         )
         response = AutocompleteResponse(resultsCount=1, results=[result])
 
@@ -478,14 +421,18 @@ class TestModelIntegration:
             min_rooms=3.0,
             max_rooms=4.0,
             min_price=1000000.0,
-            max_price=2000000.0
+            max_price=2000000.0,
         )
 
         # Create test deals
         deals = [
             Deal(objectid=1, deal_amount=1200000.0, deal_date="2024-01-01", rooms=3.0),
-            Deal(objectid=2, deal_amount=2500000.0, deal_date="2024-01-02", rooms=4.0),  # Price too high
-            Deal(objectid=3, deal_amount=1500000.0, deal_date="2024-01-03", rooms=2.0),  # Too few rooms
+            Deal(
+                objectid=2, deal_amount=2500000.0, deal_date="2024-01-02", rooms=4.0
+            ),  # Price too high
+            Deal(
+                objectid=3, deal_amount=1500000.0, deal_date="2024-01-03", rooms=2.0
+            ),  # Too few rooms
         ]
 
         # Manually check which deals would pass

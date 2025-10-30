@@ -5,6 +5,7 @@ Comprehensive tests for filter_deals_by_criteria function.
 """
 
 import pytest
+
 from nadlan_mcp.govmap.filters import filter_deals_by_criteria
 from nadlan_mcp.govmap.models import Deal, DealFilters
 
@@ -80,83 +81,79 @@ class TestFilterDealsByCriteria:
         result = filter_deals_by_criteria(sample_deals, property_type="דירה")
         # Should match "דירה" and "דירת גג" via substring match.
         assert len(result) == 3
-        assert set(d.objectid for d in result) == {1, 2, 4}
+        assert {d.objectid for d in result} == {1, 2, 4}
 
     def test_filter_by_min_rooms(self, sample_deals):
         """Test filtering by minimum rooms."""
         result = filter_deals_by_criteria(sample_deals, min_rooms=4.0)
         assert len(result) == 3
-        assert set(d.objectid for d in result) == {2, 3, 5}
+        assert {d.objectid for d in result} == {2, 3, 5}
 
     def test_filter_by_max_rooms(self, sample_deals):
         """Test filtering by maximum rooms."""
         result = filter_deals_by_criteria(sample_deals, max_rooms=3.0)
         assert len(result) == 2
-        assert set(d.objectid for d in result) == {1, 4}
+        assert {d.objectid for d in result} == {1, 4}
 
     def test_filter_by_room_range(self, sample_deals):
         """Test filtering by room range."""
         result = filter_deals_by_criteria(sample_deals, min_rooms=3.0, max_rooms=4.0)
         assert len(result) == 2
-        assert set(d.objectid for d in result) == {1, 2}
+        assert {d.objectid for d in result} == {1, 2}
 
     def test_filter_by_min_price(self, sample_deals):
         """Test filtering by minimum price."""
         result = filter_deals_by_criteria(sample_deals, min_price=1200000.0)
         assert len(result) == 3
-        assert set(d.objectid for d in result) == {2, 3, 5}
+        assert {d.objectid for d in result} == {2, 3, 5}
 
     def test_filter_by_max_price(self, sample_deals):
         """Test filtering by maximum price."""
         result = filter_deals_by_criteria(sample_deals, max_price=1000000.0)
         assert len(result) == 2
-        assert set(d.objectid for d in result) == {1, 4}
+        assert {d.objectid for d in result} == {1, 4}
 
     def test_filter_by_price_range(self, sample_deals):
         """Test filtering by price range."""
-        result = filter_deals_by_criteria(
-            sample_deals, min_price=1000000.0, max_price=1500000.0
-        )
+        result = filter_deals_by_criteria(sample_deals, min_price=1000000.0, max_price=1500000.0)
         assert len(result) == 3
-        assert set(d.objectid for d in result) == {1, 2, 5}
+        assert {d.objectid for d in result} == {1, 2, 5}
 
     def test_filter_by_min_area(self, sample_deals):
         """Test filtering by minimum area."""
         result = filter_deals_by_criteria(sample_deals, min_area=100.0)
         assert len(result) == 3
-        assert set(d.objectid for d in result) == {2, 3, 5}
+        assert {d.objectid for d in result} == {2, 3, 5}
 
     def test_filter_by_max_area(self, sample_deals):
         """Test filtering by maximum area."""
         result = filter_deals_by_criteria(sample_deals, max_area=80.0)
         assert len(result) == 2
-        assert set(d.objectid for d in result) == {1, 4}
+        assert {d.objectid for d in result} == {1, 4}
 
     def test_filter_by_area_range(self, sample_deals):
         """Test filtering by area range."""
-        result = filter_deals_by_criteria(
-            sample_deals, min_area=80.0, max_area=120.0
-        )
+        result = filter_deals_by_criteria(sample_deals, min_area=80.0, max_area=120.0)
         assert len(result) == 3
-        assert set(d.objectid for d in result) == {1, 2, 5}
+        assert {d.objectid for d in result} == {1, 2, 5}
 
     def test_filter_by_min_floor(self, sample_deals):
         """Test filtering by minimum floor."""
         result = filter_deals_by_criteria(sample_deals, min_floor=2)
         assert len(result) == 3
-        assert set(d.objectid for d in result) == {1, 2, 5}
+        assert {d.objectid for d in result} == {1, 2, 5}
 
     def test_filter_by_max_floor(self, sample_deals):
         """Test filtering by maximum floor."""
         result = filter_deals_by_criteria(sample_deals, max_floor=2)
         assert len(result) == 3
-        assert set(d.objectid for d in result) == {1, 3, 4}
+        assert {d.objectid for d in result} == {1, 3, 4}
 
     def test_filter_by_floor_range(self, sample_deals):
         """Test filtering by floor range."""
         result = filter_deals_by_criteria(sample_deals, min_floor=1, max_floor=5)
         assert len(result) == 3
-        assert set(d.objectid for d in result) == {1, 2, 4}
+        assert {d.objectid for d in result} == {1, 2, 4}
 
     def test_combined_filters(self, sample_deals):
         """Test combining multiple filters."""
@@ -171,19 +168,17 @@ class TestFilterDealsByCriteria:
         # objectid=1: "דירה", 3 rooms, 1M price ✓
         # objectid=2: "דירת גג" (matches "דירה" variant), 4 rooms, 1.5M price ✓
         assert len(result) == 2
-        assert set(d.objectid for d in result) == {1, 2}
+        assert {d.objectid for d in result} == {1, 2}
 
     def test_filter_using_dealfilters_model(self, sample_deals):
         """Test filtering using DealFilters model."""
-        filters = DealFilters(
-            property_type="דירה", min_rooms=3.0, max_rooms=4.0
-        )
+        filters = DealFilters(property_type="דירה", min_rooms=3.0, max_rooms=4.0)
         result = filter_deals_by_criteria(sample_deals, filters=filters)
         # Should match objectid=1 and objectid=2
         # objectid=1: "דירה", 3 rooms ✓
         # objectid=2: "דירת גג" (matches "דירה" variant), 4 rooms ✓
         assert len(result) == 2
-        assert set(d.objectid for d in result) == {1, 2}
+        assert {d.objectid for d in result} == {1, 2}
 
     def test_filter_using_dict(self, sample_deals):
         """Test filtering using dict (converted to DealFilters)."""
@@ -197,23 +192,35 @@ class TestFilterDealsByCriteria:
         # objectid=1: "דירה", 3 rooms ✓
         # objectid=2: "דירת גג" (matches "דירה" variant), 4 rooms ✓
         assert len(result) == 2
-        assert set(d.objectid for d in result) == {1, 2}
+        assert {d.objectid for d in result} == {1, 2}
 
     def test_individual_params_override_filters_model(self, sample_deals):
         """Test that individual parameters override filters model."""
         filters = DealFilters(min_rooms=5.0)  # Would match only objectid=3
         result = filter_deals_by_criteria(
-            sample_deals, filters=filters, min_rooms=3.0  # Override to 3.0
+            sample_deals,
+            filters=filters,
+            min_rooms=3.0,  # Override to 3.0
         )
         # Should use min_rooms=3.0, not 5.0
         assert len(result) == 4
-        assert set(d.objectid for d in result) == {1, 2, 3, 5}
+        assert {d.objectid for d in result} == {1, 2, 3, 5}
 
     def test_filters_exclude_deals_with_missing_property_type(self):
         """Test that deals with missing property_type are excluded when filter active."""
         deals = [
-            Deal(objectid=1, deal_amount=1000000, deal_date="2024-01-01", property_type_description="דירה"),
-            Deal(objectid=2, deal_amount=1000000, deal_date="2024-01-01", property_type_description=None),
+            Deal(
+                objectid=1,
+                deal_amount=1000000,
+                deal_date="2024-01-01",
+                property_type_description="דירה",
+            ),
+            Deal(
+                objectid=2,
+                deal_amount=1000000,
+                deal_date="2024-01-01",
+                property_type_description=None,
+            ),
             Deal(objectid=3, deal_amount=1000000, deal_date="2024-01-01"),  # No property_type
         ]
         result = filter_deals_by_criteria(deals, property_type="דירה")
@@ -281,13 +288,17 @@ class TestFilterDealsByCriteria:
         """Test floor filtering with Hebrew floor descriptions."""
         deals = [
             Deal(objectid=1, deal_amount=1000000, deal_date="2024-01-01", floor="קרקע"),  # Ground=0
-            Deal(objectid=2, deal_amount=1000000, deal_date="2024-01-01", floor="קומה 3"),  # Floor 3
-            Deal(objectid=3, deal_amount=1000000, deal_date="2024-01-01", floor="מרתף"),  # Basement=-1
+            Deal(
+                objectid=2, deal_amount=1000000, deal_date="2024-01-01", floor="קומה 3"
+            ),  # Floor 3
+            Deal(
+                objectid=3, deal_amount=1000000, deal_date="2024-01-01", floor="מרתף"
+            ),  # Basement=-1
         ]
         result = filter_deals_by_criteria(deals, min_floor=0)
         # Should match ground (0) and floor 3, but not basement (-1)
         assert len(result) == 2
-        assert set(d.objectid for d in result) == {1, 2}
+        assert {d.objectid for d in result} == {1, 2}
 
     @pytest.mark.parametrize(
         "min_val,max_val,expected_count",

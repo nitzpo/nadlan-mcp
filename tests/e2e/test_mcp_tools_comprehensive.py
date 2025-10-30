@@ -6,19 +6,22 @@ of each MCP tool from end to end.
 
 Mark as integration tests since they hit real APIs.
 """
+
 import json
+
 import pytest
+
 from nadlan_mcp.fastmcp_server import (
-    autocomplete_address,
-    find_recent_deals_for_address,
     analyze_market_trends,
-    get_valuation_comparables,
-    get_deal_statistics,
-    get_market_activity_metrics,
+    autocomplete_address,
     compare_addresses,
-    get_street_deals,
-    get_neighborhood_deals,
+    find_recent_deals_for_address,
+    get_deal_statistics,
     get_deals_by_radius,
+    get_market_activity_metrics,
+    get_neighborhood_deals,
+    get_street_deals,
+    get_valuation_comparables,
 )
 
 
@@ -69,9 +72,7 @@ class TestMCPToolsE2E:
 
     def test_analyze_market_trends(self):
         """Test market trend analysis."""
-        result = analyze_market_trends(
-            self.TEST_ADDRESS_1, years_back=3, radius_meters=100
-        )
+        result = analyze_market_trends(self.TEST_ADDRESS_1, years_back=3, radius_meters=100)
         data = json.loads(result)
 
         # Check response structure
@@ -83,10 +84,7 @@ class TestMCPToolsE2E:
     def test_get_valuation_comparables(self):
         """Test getting valuation comparables."""
         result = get_valuation_comparables(
-            self.TEST_ADDRESS_1,
-            years_back=3,
-            min_rooms=3.0,
-            max_rooms=5.0
+            self.TEST_ADDRESS_1, years_back=3, min_rooms=3.0, max_rooms=5.0
         )
         data = json.loads(result)
 

@@ -1,6 +1,10 @@
 # Pre-commit hooks for code quality
-# Install: pre-commit install
-# Run manually: pre-commit run --all-files
+#
+# NOTE: These hooks are NOT installed locally (by design)
+# They run automatically in GitHub Actions as PR checks
+# This allows commits without blocking, with checks shown in PRs
+#
+# To run manually: pre-commit run --all-files
 # Update hooks: pre-commit autoupdate
 
 repos:

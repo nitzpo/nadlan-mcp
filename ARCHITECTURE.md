@@ -218,13 +218,13 @@ deal_json = deal.model_dump_json()
 def tool_name(param: type, summarized_response: bool = False) -> str:
     """
     Tool description for LLM.
-    
+
     Args:
         param: Parameter description
-        summarized_response: 
+        summarized_response:
             - False (default): Full structured data for LLM processing
             - True: Condensed summary with key insights
-    
+
     Returns:
         JSON string with data or summary
     """
@@ -625,4 +625,3 @@ logging.basicConfig(level=logging.DEBUG)
 - [MCP Protocol](https://modelcontextprotocol.io/)
 - [FastMCP Documentation](https://github.com/jlowin/fastmcp)
 - [Israeli Real Estate Data](https://data.gov.il/)
-

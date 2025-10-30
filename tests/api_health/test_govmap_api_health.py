@@ -8,8 +8,9 @@ IMPORTANT: These make real API calls and take longer to run.
 """
 
 import pytest
+
 from nadlan_mcp.govmap import GovmapClient
-from nadlan_mcp.govmap.models import Deal, AutocompleteResponse
+from nadlan_mcp.govmap.models import AutocompleteResponse, Deal
 
 
 @pytest.fixture
@@ -37,16 +38,16 @@ class TestAutocompleteAPIHealth:
         response = client.autocomplete_address("דיזנגוף תל אביב")
 
         # Check response model fields exist
-        assert hasattr(response, 'results_count')
-        assert hasattr(response, 'results')
+        assert hasattr(response, "results_count")
+        assert hasattr(response, "results")
 
         # Check result fields
         if len(response.results) > 0:
             result = response.results[0]
-            assert hasattr(result, 'id')
-            assert hasattr(result, 'text')
-            assert hasattr(result, 'type')
-            assert hasattr(result, 'coordinates')
+            assert hasattr(result, "id")
+            assert hasattr(result, "text")
+            assert hasattr(result, "type")
+            assert hasattr(result, "coordinates")
 
     @pytest.mark.api_health
     def test_autocomplete_coordinates_present(self, client):
@@ -128,18 +129,18 @@ class TestDealsAPIHealth:
         deal = deals[0]
 
         # Check required fields
-        assert hasattr(deal, 'objectid')
-        assert hasattr(deal, 'deal_amount')
-        assert hasattr(deal, 'deal_date')
+        assert hasattr(deal, "objectid")
+        assert hasattr(deal, "deal_amount")
+        assert hasattr(deal, "deal_date")
 
         # Check common optional fields
-        assert hasattr(deal, 'asset_area')
-        assert hasattr(deal, 'property_type_description')
-        assert hasattr(deal, 'rooms')
-        assert hasattr(deal, 'floor')
+        assert hasattr(deal, "asset_area")
+        assert hasattr(deal, "property_type_description")
+        assert hasattr(deal, "rooms")
+        assert hasattr(deal, "floor")
 
         # Check computed field
-        assert hasattr(deal, 'price_per_sqm')
+        assert hasattr(deal, "price_per_sqm")
 
 
 class TestAPIDataQuality:
@@ -169,8 +170,9 @@ class TestAPIDataQuality:
         # Check deal amounts are reasonable (10K to 100M NIS)
         for deal in deals:
             if deal.deal_amount > 0:
-                assert 10000 <= deal.deal_amount <= 100000000, \
-                    f"Deal amount {deal.deal_amount} outside reasonable range"
+                assert (
+                    10000 <= deal.deal_amount <= 100000000
+                ), f"Deal amount {deal.deal_amount} outside reasonable range"
 
     @pytest.mark.api_health
     def test_dates_are_recent(self, client):
@@ -196,7 +198,7 @@ class TestAPIDataQuality:
             pytest.skip("No deals")
 
         # At least some deals should be from last 5 years
-        cutoff = date.today() - timedelta(days=5*365)
+        cutoff = date.today() - timedelta(days=5 * 365)
         recent_deals = [d for d in deals if isinstance(d.deal_date, date) and d.deal_date >= cutoff]
 
         assert len(recent_deals) > 0, "No recent deals found (within last 5 years)"

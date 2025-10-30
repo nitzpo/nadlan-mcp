@@ -2,8 +2,10 @@
 Pytest configuration for nadlan_mcp tests.
 """
 
-import pytest
 from unittest.mock import Mock
+
+import pytest
+
 from tests.vcr_config import my_vcr
 
 
@@ -27,9 +29,9 @@ def sample_autocomplete_response():
                 "type": "address",
                 "score": 100,
                 "shape": "POINT(3870000.123 3770000.456)",
-                "data": {}
+                "data": {},
             }
-        ]
+        ],
     }
 
 
@@ -46,7 +48,7 @@ def sample_deals_response():
                 "assetArea": 100,
                 "settlementNameHeb": "תל אביב-יפו",
                 "propertyTypeDescription": "דירה",
-                "neighborhood": "test neighborhood"
+                "neighborhood": "test neighborhood",
             },
             {
                 "objectid": 456,
@@ -55,9 +57,9 @@ def sample_deals_response():
                 "assetArea": 120,
                 "settlementNameHeb": "תל אביב-יפو",
                 "propertyTypeDescription": "דירה",
-                "neighborhood": "test neighborhood"
-            }
-        ]
+                "neighborhood": "test neighborhood",
+            },
+        ],
     }
 
 

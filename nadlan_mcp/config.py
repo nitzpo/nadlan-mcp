@@ -6,47 +6,40 @@ rate limiting, and other settings. Configuration can be set via environment
 variables or code.
 """
 
+from dataclasses import dataclass, field
 import os
 from typing import Optional
-from dataclasses import dataclass, field
 
 
 @dataclass
 class GovmapConfig:
     """Configuration for Govmap API client."""
-    
+
     # API settings
     base_url: str = field(
-        default_factory=lambda: os.getenv(
-            "GOVMAP_BASE_URL", 
-            "https://www.govmap.gov.il/api/"
-        )
+        default_factory=lambda: os.getenv("GOVMAP_BASE_URL", "https://www.govmap.gov.il/api/")
     )
-    
+
     # Timeout settings (in seconds)
     connect_timeout: int = field(
         default_factory=lambda: int(os.getenv("GOVMAP_CONNECT_TIMEOUT", "10"))
     )
-    read_timeout: int = field(
-        default_factory=lambda: int(os.getenv("GOVMAP_READ_TIMEOUT", "30"))
-    )
-    
+    read_timeout: int = field(default_factory=lambda: int(os.getenv("GOVMAP_READ_TIMEOUT", "30")))
+
     # Retry settings
-    max_retries: int = field(
-        default_factory=lambda: int(os.getenv("GOVMAP_MAX_RETRIES", "3"))
-    )
+    max_retries: int = field(default_factory=lambda: int(os.getenv("GOVMAP_MAX_RETRIES", "3")))
     retry_min_wait: int = field(
         default_factory=lambda: int(os.getenv("GOVMAP_RETRY_MIN_WAIT", "1"))
     )
     retry_max_wait: int = field(
         default_factory=lambda: int(os.getenv("GOVMAP_RETRY_MAX_WAIT", "10"))
     )
-    
+
     # Rate limiting
     requests_per_second: float = field(
         default_factory=lambda: float(os.getenv("GOVMAP_REQUESTS_PER_SECOND", "5.0"))
     )
-    
+
     # Default search parameters
     default_radius_meters: int = field(
         default_factory=lambda: int(os.getenv("GOVMAP_DEFAULT_RADIUS", "50"))
@@ -62,19 +55,16 @@ class GovmapConfig:
     max_polygons_to_query: int = field(
         default_factory=lambda: int(os.getenv("GOVMAP_MAX_POLYGONS", "10"))
     )
-    
+
     # User agent
     user_agent: str = field(
-        default_factory=lambda: os.getenv(
-            "GOVMAP_USER_AGENT",
-            "NadlanMCP/1.0.0"
-        )
+        default_factory=lambda: os.getenv("GOVMAP_USER_AGENT", "NadlanMCP/1.0.0")
     )
-    
+
     def __post_init__(self):
         """Validate configuration after initialization."""
         self._validate()
-    
+
     def _validate(self):
         """Validate configuration values."""
         if self.connect_timeout <= 0:
@@ -110,7 +100,7 @@ _config: Optional[GovmapConfig] = None
 def get_config() -> GovmapConfig:
     """
     Get the global configuration instance.
-    
+
     Returns:
         GovmapConfig: The global configuration object
     """
@@ -123,7 +113,7 @@ def get_config() -> GovmapConfig:
 def set_config(config: GovmapConfig):
     """
     Set the global configuration instance.
-    
+
     Args:
         config: The new configuration object
     """
@@ -135,4 +125,3 @@ def reset_config():
     """Reset the global configuration to default values."""
     global _config
     _config = None
-

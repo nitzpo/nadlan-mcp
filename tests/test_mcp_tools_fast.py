@@ -6,19 +6,20 @@ without hitting the real Govmap API.
 
 For full E2E tests with real API calls, see tests/e2e/test_mcp_tools.py
 """
+
 import json
-import pytest
 from pathlib import Path
-from unittest.mock import patch, Mock
-from nadlan_mcp.govmap.models import Deal, AutocompleteResult, AutocompleteResponse, CoordinatePoint
+from unittest.mock import patch
+
+import pytest
+
 from nadlan_mcp.fastmcp_server import (
     autocomplete_address,
-    find_recent_deals_for_address,
-    get_street_deals,
-    get_neighborhood_deals,
     get_deals_by_radius,
+    get_neighborhood_deals,
+    get_street_deals,
 )
-
+from nadlan_mcp.govmap.models import AutocompleteResponse, AutocompleteResult, Deal
 
 # Load fixtures
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -61,7 +62,7 @@ def mock_polygon_metadata_data():
 class TestMCPToolsFast:
     """Fast unit tests for MCP tools using mocked data."""
 
-    @patch('nadlan_mcp.fastmcp_server.client')
+    @patch("nadlan_mcp.fastmcp_server.client")
     def test_autocomplete_address_fast(self, mock_client, mock_autocomplete_data):
         """Test autocomplete with cached data."""
         mock_client.autocomplete_address.return_value = mock_autocomplete_data
@@ -74,7 +75,7 @@ class TestMCPToolsFast:
         assert "text" in data[0]
         assert "coordinates" in data[0]
 
-    @patch('nadlan_mcp.fastmcp_server.client')
+    @patch("nadlan_mcp.fastmcp_server.client")
     def test_get_street_deals_fast(self, mock_client, mock_street_deals_data):
         """Test street deals with cached data."""
         mock_client.get_street_deals.return_value = mock_street_deals_data
@@ -92,7 +93,7 @@ class TestMCPToolsFast:
         assert "deal_amount" in deal
         assert "deal_date" in deal
 
-    @patch('nadlan_mcp.fastmcp_server.client')
+    @patch("nadlan_mcp.fastmcp_server.client")
     def test_get_neighborhood_deals_fast(self, mock_client, mock_neighborhood_deals_data):
         """Test neighborhood deals with cached data."""
         mock_client.get_neighborhood_deals.return_value = mock_neighborhood_deals_data
@@ -104,7 +105,7 @@ class TestMCPToolsFast:
         assert data["total_deals"] == len(mock_neighborhood_deals_data)
         assert "deals" in data
 
-    @patch('nadlan_mcp.fastmcp_server.client')
+    @patch("nadlan_mcp.fastmcp_server.client")
     def test_get_deals_by_radius_fast(self, mock_client, mock_polygon_metadata_data):
         """Test deals by radius with cached data."""
         mock_client.get_deals_by_radius.return_value = mock_polygon_metadata_data
@@ -117,10 +118,15 @@ class TestMCPToolsFast:
         assert "polygons" in data
 
     @pytest.mark.skip(reason="Complex workflow with statistics - tested in E2E suite")
-    @patch('nadlan_mcp.fastmcp_server.client')
-    def test_find_recent_deals_fast(self, mock_client, mock_street_deals_data,
-                                     mock_neighborhood_deals_data, mock_polygon_metadata_data,
-                                     mock_autocomplete_data):
+    @patch("nadlan_mcp.fastmcp_server.client")
+    def test_find_recent_deals_fast(
+        self,
+        mock_client,
+        mock_street_deals_data,
+        mock_neighborhood_deals_data,
+        mock_polygon_metadata_data,
+        mock_autocomplete_data,
+    ):
         """Test find_recent_deals with fully mocked workflow.
 
         NOTE: This test is skipped because find_recent_deals_for_address has complex
@@ -129,7 +135,7 @@ class TestMCPToolsFast:
         """
         pass
 
-    @patch('nadlan_mcp.fastmcp_server.client')
+    @patch("nadlan_mcp.fastmcp_server.client")
     def test_no_deals_found(self, mock_client):
         """Test handling when no deals are found."""
         mock_client.get_street_deals.return_value = []
@@ -140,7 +146,7 @@ class TestMCPToolsFast:
         assert isinstance(result, str)
         assert "No" in result or "found" in result.lower()
 
-    @patch('nadlan_mcp.fastmcp_server.client')
+    @patch("nadlan_mcp.fastmcp_server.client")
     def test_deal_type_filtering(self, mock_client, mock_street_deals_data):
         """Test that deal_type parameter is passed correctly."""
         mock_client.get_street_deals.return_value = mock_street_deals_data

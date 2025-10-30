@@ -6,13 +6,16 @@ For comprehensive E2E testing, see test_mcp_tools_comprehensive.py
 
 Target: Complete in <30 seconds
 """
+
 import json
+
 import pytest
+
 from nadlan_mcp.fastmcp_server import (
     autocomplete_address,
     find_recent_deals_for_address,
-    get_street_deals,
     get_deals_by_radius,
+    get_street_deals,
 )
 
 
@@ -58,10 +61,7 @@ class TestMCPToolsSmokeTests:
         """Smoke test: Main tool works with minimal data."""
         # Use very small limits to speed up
         result = find_recent_deals_for_address(
-            self.TEST_ADDRESS,
-            years_back=1,
-            radius_meters=30,
-            max_deals=10
+            self.TEST_ADDRESS, years_back=1, radius_meters=30, max_deals=10
         )
         data = json.loads(result)
 

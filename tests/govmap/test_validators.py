@@ -5,11 +5,12 @@ Tests input validation functions for addresses, coordinates, integers, and deal 
 """
 
 import pytest
+
 from nadlan_mcp.govmap.validators import (
     validate_address,
     validate_coordinates,
-    validate_positive_int,
     validate_deal_type,
+    validate_positive_int,
 )
 
 

@@ -4,33 +4,34 @@ Tests for the GovmapClient class.
 Updated for Phase 4.1 - Pydantic models integration.
 """
 
-import pytest
-import requests
 from unittest.mock import Mock, patch
-from nadlan_mcp.govmap import GovmapClient
-from nadlan_mcp.govmap.models import Deal, AutocompleteResponse, AutocompleteResult, CoordinatePoint
+
+import pytest
+
 from nadlan_mcp.config import GovmapConfig
+from nadlan_mcp.govmap import GovmapClient
+from nadlan_mcp.govmap.models import AutocompleteResponse, AutocompleteResult, CoordinatePoint, Deal
 
 
 class TestGovmapClient:
     """Test cases for GovmapClient class."""
-    
+
     def test_client_initialization(self):
         """Test that GovmapClient initializes correctly."""
         client = GovmapClient()
         assert client.base_url == "https://www.govmap.gov.il/api"
         assert client.session is not None
-        assert client.session.headers['Content-Type'] == 'application/json'
-        assert client.session.headers['User-Agent'] == 'NadlanMCP/1.0.0'
-    
+        assert client.session.headers["Content-Type"] == "application/json"
+        assert client.session.headers["User-Agent"] == "NadlanMCP/1.0.0"
+
     def test_client_initialization_with_custom_url(self):
         """Test that GovmapClient can be initialized with custom URL."""
         custom_url = "https://custom-api.example.com/api/"
         custom_config = GovmapConfig(base_url=custom_url)
         client = GovmapClient(custom_config)
         assert client.base_url == "https://custom-api.example.com/api"
-    
-    @patch('requests.Session')
+
+    @patch("requests.Session")
     def test_autocomplete_address_success(self, mock_session_class):
         """Test successful address autocomplete."""
         # Mock response
@@ -44,9 +45,9 @@ class TestGovmapClient:
                     "type": "address",
                     "score": 100,
                     "shape": "POINT(3870000.123 3770000.456)",
-                    "data": {}
+                    "data": {},
                 }
-            ]
+            ],
         }
         mock_response.raise_for_status.return_value = None
 
@@ -65,8 +66,8 @@ class TestGovmapClient:
         assert result.results[0].coordinates is not None
         assert result.results[0].coordinates.longitude == 3870000.123
         mock_session.post.assert_called_once()
-    
-    @patch('requests.Session')
+
+    @patch("requests.Session")
     def test_autocomplete_address_empty_results(self, mock_session_class):
         """Test autocomplete with empty results - should return empty results, not raise error."""
         mock_response = Mock()
@@ -83,23 +84,23 @@ class TestGovmapClient:
         assert isinstance(result, AutocompleteResponse)
         assert result.results_count == 0
         assert len(result.results) == 0
-    
-    @patch('requests.Session')
+
+    @patch("requests.Session")
     def test_autocomplete_address_invalid_response(self, mock_session_class):
         """Test autocomplete with truly invalid response format."""
         mock_response = Mock()
         mock_response.json.return_value = {"invalid": "response"}  # Missing 'results' key
         mock_response.raise_for_status.return_value = None
-        
+
         mock_session = Mock()
         mock_session.post.return_value = mock_response
         mock_session_class.return_value = mock_session
-        
+
         client = GovmapClient()
-        
+
         with pytest.raises(ValueError, match="Invalid response format"):
             client.autocomplete_address("test")
-    
+
     def test_coordinate_parsing_from_wkt_point(self):
         """Test coordinate parsing from WKT POINT format."""
         client = GovmapClient()
@@ -113,20 +114,20 @@ class TestGovmapClient:
                     text="test address",
                     type="address",
                     shape="POINT(3870000.123 3770000.456)",
-                    coordinates=CoordinatePoint(longitude=3870000.123, latitude=3770000.456)
+                    coordinates=CoordinatePoint(longitude=3870000.123, latitude=3770000.456),
                 )
-            ]
+            ],
         )
 
         # We'll test the coordinate parsing logic by calling the method that uses it
-        with patch.object(client, 'autocomplete_address', return_value=mock_autocomplete_result):
-            with patch.object(client, 'get_deals_by_radius', return_value=[]):
-                with patch.object(client, 'get_street_deals', return_value=[]):
-                    with patch.object(client, 'get_neighborhood_deals', return_value=[]):
+        with patch.object(client, "autocomplete_address", return_value=mock_autocomplete_result):
+            with patch.object(client, "get_deals_by_radius", return_value=[]):
+                with patch.object(client, "get_street_deals", return_value=[]):
+                    with patch.object(client, "get_neighborhood_deals", return_value=[]):
                         result = client.find_recent_deals_for_address("test", years_back=1)
                         assert result == []
-    
-    @patch('requests.Session')
+
+    @patch("requests.Session")
     def test_get_deals_by_radius_success(self, mock_session_class):
         """Test successful polygon metadata retrieval by radius."""
         mock_response = Mock()
@@ -138,7 +139,7 @@ class TestGovmapClient:
                 "settlementNameHeb": "תל אביב-יפו",
                 "streetNameHeb": "דיזנגוף",
                 "houseNum": 50,
-                "polygon_id": "123-456"
+                "polygon_id": "123-456",
             }
         ]
         mock_response.raise_for_status.return_value = None
@@ -156,8 +157,8 @@ class TestGovmapClient:
         assert result[0]["objectid"] == 12345
         assert result[0]["polygon_id"] == "123-456"
         mock_session.get.assert_called_once()
-    
-    @patch('requests.Session')
+
+    @patch("requests.Session")
     def test_get_street_deals_success(self, mock_session_class):
         """Test successful street deals query."""
         mock_response = Mock()
@@ -170,16 +171,16 @@ class TestGovmapClient:
                     "dealDate": "2025-01-01T00:00:00.000Z",
                     "assetArea": 100,
                     "settlementNameHeb": "תל אביב-יפו",
-                    "propertyTypeDescription": "דירה"
+                    "propertyTypeDescription": "דירה",
                 }
-            ]
+            ],
         }
         mock_response.raise_for_status.return_value = None
-        
+
         mock_session = Mock()
         mock_session.get.return_value = mock_response
         mock_session_class.return_value = mock_session
-        
+
         client = GovmapClient()
         result = client.get_street_deals("123-456")
 
@@ -190,8 +191,8 @@ class TestGovmapClient:
         assert result[0].asset_area == 100
         assert result[0].price_per_sqm == 10000.0  # Computed field
         mock_session.get.assert_called_once()
-    
-    @patch('requests.Session')
+
+    @patch("requests.Session")
     def test_get_neighborhood_deals_success(self, mock_session_class):
         """Test successful neighborhood deals query."""
         mock_response = Mock()
@@ -204,16 +205,16 @@ class TestGovmapClient:
                     "dealDate": "2025-01-15T00:00:00.000Z",
                     "assetArea": 120,
                     "settlementNameHeb": "תל אביב-יפו",
-                    "propertyTypeDescription": "דירה"
+                    "propertyTypeDescription": "דירה",
                 }
-            ]
+            ],
         }
         mock_response.raise_for_status.return_value = None
-        
+
         mock_session = Mock()
         mock_session.get.return_value = mock_response
         mock_session_class.return_value = mock_session
-        
+
         client = GovmapClient()
         result = client.get_neighborhood_deals("123-456")
 
@@ -224,14 +225,20 @@ class TestGovmapClient:
         assert result[0].asset_area == 120
         assert result[0].price_per_sqm == round(2000000 / 120, 2)
         mock_session.get.assert_called_once()
-    
-    @patch('nadlan_mcp.govmap.client.GovmapClient.get_neighborhood_deals')
-    @patch('nadlan_mcp.govmap.client.GovmapClient.get_street_deals')
-    @patch('nadlan_mcp.govmap.client.GovmapClient.get_deals_by_radius')
-    @patch('nadlan_mcp.govmap.client.GovmapClient.autocomplete_address')
-    def test_find_recent_deals_for_address_integration(self, mock_autocomplete, mock_radius, mock_street, mock_neighborhood):
+
+    @patch("nadlan_mcp.govmap.client.GovmapClient.get_neighborhood_deals")
+    @patch("nadlan_mcp.govmap.client.GovmapClient.get_street_deals")
+    @patch("nadlan_mcp.govmap.client.GovmapClient.get_deals_by_radius")
+    @patch("nadlan_mcp.govmap.client.GovmapClient.autocomplete_address")
+    def test_find_recent_deals_for_address_integration(
+        self, mock_autocomplete, mock_radius, mock_street, mock_neighborhood
+    ):
         """Test the main integration function."""
-        from nadlan_mcp.govmap.models import CoordinatePoint, AutocompleteResult, AutocompleteResponse
+        from nadlan_mcp.govmap.models import (
+            AutocompleteResponse,
+            AutocompleteResult,
+            CoordinatePoint,
+        )
 
         # Mock autocomplete response - now returns AutocompleteResponse model
         mock_autocomplete.return_value = AutocompleteResponse(
@@ -242,14 +249,19 @@ class TestGovmapClient:
                     id="addr123",
                     type="address",
                     coordinates=CoordinatePoint(longitude=3870000.123, latitude=3770000.456),
-                    shape="POINT(3870000.123 3770000.456)"
+                    shape="POINT(3870000.123 3770000.456)",
                 )
-            ]
+            ],
         )
 
         # Mock radius response - now returns List[Dict] (polygon metadata)
         mock_radius.return_value = [
-            {"objectid": 1, "dealscount": "10", "polygon_id": "123-456", "settlementNameHeb": "Tel Aviv"}
+            {
+                "objectid": 1,
+                "dealscount": "10",
+                "polygon_id": "123-456",
+                "settlementNameHeb": "Tel Aviv",
+            }
         ]
 
         # Mock street deals response - now returns List[Deal]
@@ -259,7 +271,7 @@ class TestGovmapClient:
                 deal_amount=1000000,
                 deal_date="2025-01-01T00:00:00.000Z",
                 street_name="Test Street",
-                house_number="1"
+                house_number="1",
             )
         ]
 
@@ -270,7 +282,7 @@ class TestGovmapClient:
                 deal_amount=2000000,
                 deal_date="2025-01-15T00:00:00.000Z",
                 street_name="Test Street",
-                house_number="2"
+                house_number="2",
             )
         ]
 
@@ -284,25 +296,25 @@ class TestGovmapClient:
 
         # Should be sorted by priority first (street=1 before neighborhood=2), then by date
         # Priority is set dynamically by find_recent_deals_for_address
-        assert hasattr(result[0], 'priority')
-        assert hasattr(result[1], 'priority')
+        assert hasattr(result[0], "priority")
+        assert hasattr(result[1], "priority")
         assert result[0].priority <= result[1].priority  # Lower priority comes first
-    
-    @patch('requests.Session')
+
+    @patch("requests.Session")
     def test_http_error_handling(self, mock_session_class):
         """Test that HTTP errors are properly handled."""
         mock_response = Mock()
         mock_response.raise_for_status.side_effect = Exception("HTTP Error")
-        
+
         mock_session = Mock()
         mock_session.post.return_value = mock_response
         mock_session_class.return_value = mock_session
-        
+
         client = GovmapClient()
-        
+
         with pytest.raises(Exception, match="HTTP Error"):
             client.autocomplete_address("test")
-    
+
     def test_invalid_coordinate_format(self):
         """Test handling of invalid coordinate formats."""
         client = GovmapClient()
@@ -316,12 +328,12 @@ class TestGovmapClient:
                     text="test address",
                     type="address",
                     shape="INVALID_FORMAT",  # Invalid format
-                    coordinates=None  # No coordinates
+                    coordinates=None,  # No coordinates
                 )
-            ]
+            ],
         )
 
-        with patch.object(client, 'autocomplete_address', return_value=mock_autocomplete_result):
+        with patch.object(client, "autocomplete_address", return_value=mock_autocomplete_result):
             with pytest.raises(ValueError, match="No coordinates found"):
                 client.find_recent_deals_for_address("test", years_back=1)
 
@@ -332,18 +344,21 @@ class TestMarketAnalysisFunctions:
     def test_calculate_market_activity_score_success(self):
         """Test successful market activity score calculation."""
         from nadlan_mcp.govmap.models import MarketActivityScore
+
         client = GovmapClient()
 
         # Sample deals with dates - now using Deal models
         deals = [
             Deal(objectid=i, deal_date=date, deal_amount=amount)
-            for i, (date, amount) in enumerate([
-                ("2023-01-15", 1000000),
-                ("2023-01-20", 1100000),
-                ("2023-02-10", 1200000),
-                ("2023-03-05", 1150000),
-                ("2023-04-12", 1250000),
-            ])
+            for i, (date, amount) in enumerate(
+                [
+                    ("2023-01-15", 1000000),
+                    ("2023-01-20", 1100000),
+                    ("2023-02-10", 1200000),
+                    ("2023-03-05", 1150000),
+                    ("2023-04-12", 1250000),
+                ]
+            )
         ]
 
         result = client.calculate_market_activity_score(deals, time_period_months=None)
@@ -360,14 +375,18 @@ class TestMarketAnalysisFunctions:
         """Test market activity score with empty deals list."""
         client = GovmapClient()
 
-        with pytest.raises(ValueError, match="Cannot calculate market activity from empty deals list"):
+        with pytest.raises(
+            ValueError, match="Cannot calculate market activity from empty deals list"
+        ):
             client.calculate_market_activity_score([])
 
     def test_calculate_market_activity_score_with_time_filter(self):
         """Test market activity score with time period filtering."""
         # Note: With Pydantic models, deal_date is required and validated
         from datetime import datetime, timedelta
+
         from nadlan_mcp.govmap.models import MarketActivityScore
+
         client = GovmapClient()
 
         # Create deals spanning several months using recent dates
@@ -376,7 +395,7 @@ class TestMarketAnalysisFunctions:
             Deal(
                 objectid=i,
                 deal_date=(today - timedelta(days=30 * month)).strftime("%Y-%m-%d"),
-                deal_amount=1000000 + i * 10000
+                deal_amount=1000000 + i * 10000,
             )
             for i, month in enumerate([1, 1, 2, 3, 3, 3, 6, 11], 1)  # All within last 12 months
         ]
@@ -392,7 +411,9 @@ class TestMarketAnalysisFunctions:
 
         # Generate many deals across multiple months for trend analysis - now using Deal models
         deals = [
-            Deal(objectid=i, deal_date=f"2023-{(i % 6) + 1:02d}-15", deal_amount=1000000 + i * 10000)
+            Deal(
+                objectid=i, deal_date=f"2023-{(i % 6) + 1:02d}-15", deal_amount=1000000 + i * 10000
+            )
             for i in range(1, 31)  # 30 deals spread across 6 months
         ]
 
@@ -405,31 +426,34 @@ class TestMarketAnalysisFunctions:
     def test_analyze_investment_potential_success(self):
         """Test successful investment potential analysis."""
         from nadlan_mcp.govmap.models import InvestmentAnalysis
+
         client = GovmapClient()
 
         # Sample deals with price appreciation - now using Deal models
         # Note: price_per_sqm is computed automatically from deal_amount / asset_area
         deals = [
             Deal(objectid=i, deal_date=date, deal_amount=amount, asset_area=80.0)
-            for i, (date, amount) in enumerate([
-                ("2022-01-15", 1000000),
-                ("2022-06-10", 1050000),
-                ("2023-01-05", 1100000),
-                ("2023-06-12", 1150000),
-            ])
+            for i, (date, amount) in enumerate(
+                [
+                    ("2022-01-15", 1000000),
+                    ("2022-06-10", 1050000),
+                    ("2023-01-05", 1100000),
+                    ("2023-06-12", 1150000),
+                ]
+            )
         ]
 
         result = client.analyze_investment_potential(deals)
 
         # Now returns InvestmentAnalysis model
         assert isinstance(result, InvestmentAnalysis)
-        assert hasattr(result, 'price_appreciation_rate')
-        assert hasattr(result, 'price_volatility')
-        assert hasattr(result, 'market_stability')
-        assert hasattr(result, 'price_trend')
-        assert hasattr(result, 'avg_price_per_sqm')
-        assert hasattr(result, 'investment_score')
-        assert hasattr(result, 'data_quality')
+        assert hasattr(result, "price_appreciation_rate")
+        assert hasattr(result, "price_volatility")
+        assert hasattr(result, "market_stability")
+        assert hasattr(result, "price_trend")
+        assert hasattr(result, "avg_price_per_sqm")
+        assert hasattr(result, "investment_score")
+        assert hasattr(result, "data_quality")
         assert 0 <= result.investment_score <= 100
         assert result.price_trend in ["increasing", "stable", "decreasing"]
 
@@ -437,7 +461,9 @@ class TestMarketAnalysisFunctions:
         """Test investment potential with empty deals list."""
         client = GovmapClient()
 
-        with pytest.raises(ValueError, match="Cannot analyze investment potential from empty deals list"):
+        with pytest.raises(
+            ValueError, match="Cannot analyze investment potential from empty deals list"
+        ):
             client.analyze_investment_potential([])
 
     def test_analyze_investment_potential_insufficient_data(self):
@@ -459,7 +485,12 @@ class TestMarketAnalysisFunctions:
 
         # Deals with consistent prices (very stable) - now using Deal models
         deals = [
-            Deal(objectid=i, deal_date=f"2023-{i:02d}-15", deal_amount=1000000 + i * 1000, asset_area=80.0)
+            Deal(
+                objectid=i,
+                deal_date=f"2023-{i:02d}-15",
+                deal_amount=1000000 + i * 1000,
+                asset_area=80.0,
+            )
             for i in range(1, 13)  # 12 months, slight increase
         ]
 
@@ -472,19 +503,22 @@ class TestMarketAnalysisFunctions:
     def test_get_market_liquidity_success(self):
         """Test successful market liquidity calculation."""
         from nadlan_mcp.govmap.models import LiquidityMetrics
+
         client = GovmapClient()
 
         # Sample deals across multiple quarters - now using Deal models
         deals = [
             Deal(objectid=i, deal_date=date, deal_amount=amount)
-            for i, (date, amount) in enumerate([
-                ("2023-01-15", 1000000),
-                ("2023-02-20", 1100000),
-                ("2023-05-10", 1200000),
-                ("2023-06-05", 1150000),
-                ("2023-09-12", 1250000),
-                ("2023-10-18", 1300000),
-            ])
+            for i, (date, amount) in enumerate(
+                [
+                    ("2023-01-15", 1000000),
+                    ("2023-02-20", 1100000),
+                    ("2023-05-10", 1200000),
+                    ("2023-06-05", 1150000),
+                    ("2023-09-12", 1250000),
+                    ("2023-10-18", 1300000),
+                ]
+            )
         ]
 
         result = client.get_market_liquidity(deals, time_period_months=None)
@@ -500,12 +534,15 @@ class TestMarketAnalysisFunctions:
         """Test market liquidity with empty deals list."""
         client = GovmapClient()
 
-        with pytest.raises(ValueError, match="Cannot calculate market liquidity from empty deals list"):
+        with pytest.raises(
+            ValueError, match="Cannot calculate market liquidity from empty deals list"
+        ):
             client.get_market_liquidity([])
 
     def test_get_market_liquidity_varied_periods(self):
         """Test market liquidity with varied time periods."""
         from datetime import datetime, timedelta
+
         client = GovmapClient()
 
         # Deals spread across recent quarters - now using Deal models
@@ -514,7 +551,7 @@ class TestMarketAnalysisFunctions:
             Deal(
                 objectid=i,
                 deal_date=(today - timedelta(days=days)).strftime("%Y-%m-%d"),
-                deal_amount=1000000
+                deal_amount=1000000,
             )
             for i, days in enumerate([30, 60, 150, 240, 330])  # Spread across ~11 months
         ]
@@ -532,9 +569,27 @@ class TestMarketAnalysisFunctions:
 
         # Now using Deal models
         deals = [
-            Deal(objectid=1, property_type_description="דירה", rooms=3, deal_amount=1000000, deal_date="2023-01-01"),
-            Deal(objectid=2, property_type_description="בית", rooms=5, deal_amount=2000000, deal_date="2023-01-01"),
-            Deal(objectid=3, property_type_description="דירה", rooms=4, deal_amount=1500000, deal_date="2023-01-01"),
+            Deal(
+                objectid=1,
+                property_type_description="דירה",
+                rooms=3,
+                deal_amount=1000000,
+                deal_date="2023-01-01",
+            ),
+            Deal(
+                objectid=2,
+                property_type_description="בית",
+                rooms=5,
+                deal_amount=2000000,
+                deal_date="2023-01-01",
+            ),
+            Deal(
+                objectid=3,
+                property_type_description="דירה",
+                rooms=4,
+                deal_amount=1500000,
+                deal_date="2023-01-01",
+            ),
         ]
 
         filtered = client.filter_deals_by_criteria(deals, property_type="דירה")
@@ -551,7 +606,9 @@ class TestMarketAnalysisFunctions:
         # Now using Deal models
         deals = [
             Deal(objectid=i, rooms=rooms, deal_amount=amount, deal_date="2023-01-01")
-            for i, (rooms, amount) in enumerate([(2, 800000), (3, 1000000), (4, 1500000), (5, 2000000)])
+            for i, (rooms, amount) in enumerate(
+                [(2, 800000), (3, 1000000), (4, 1500000), (5, 2000000)]
+            )
         ]
 
         filtered = client.filter_deals_by_criteria(deals, min_rooms=3, max_rooms=4)
@@ -579,6 +636,7 @@ class TestMarketAnalysisFunctions:
     def test_calculate_deal_statistics_success(self):
         """Test successful deal statistics calculation."""
         from nadlan_mcp.govmap.models import DealStatistics
+
         client = GovmapClient()
 
         # Now using Deal models - price_per_sqm computed automatically
@@ -620,10 +678,27 @@ class TestMarketAnalysisFunctions:
         """Test that deals with missing property type are excluded when filter is active."""
         client = GovmapClient()
         deals = [
-            Deal(objectid=1, deal_amount=1000000, deal_date="2023-01-01", property_type_description="דירה"),
-            Deal(objectid=2, deal_amount=1000000, deal_date="2023-01-01", property_type_description=None),
-            Deal(objectid=3, deal_amount=1000000, deal_date="2023-01-01", property_type_description="בית"),
-            Deal(objectid=4, deal_amount=1000000, deal_date="2023-01-01"),  # Missing property_type_description
+            Deal(
+                objectid=1,
+                deal_amount=1000000,
+                deal_date="2023-01-01",
+                property_type_description="דירה",
+            ),
+            Deal(
+                objectid=2,
+                deal_amount=1000000,
+                deal_date="2023-01-01",
+                property_type_description=None,
+            ),
+            Deal(
+                objectid=3,
+                deal_amount=1000000,
+                deal_date="2023-01-01",
+                property_type_description="בית",
+            ),
+            Deal(
+                objectid=4, deal_amount=1000000, deal_date="2023-01-01"
+            ),  # Missing property_type_description
         ]
 
         filtered = client.filter_deals_by_criteria(deals, property_type="דירה")
@@ -684,10 +759,18 @@ class TestMarketAnalysisFunctions:
         # This test now verifies filtering based on numeric ranges
         client = GovmapClient()
         deals = [
-            Deal(objectid=1, deal_amount=2000000, deal_date="2023-01-01", asset_area=65.0, rooms=3.0),
-            Deal(objectid=2, deal_amount=2000000, deal_date="2023-01-01", asset_area=80.0, rooms=3.0),  # Area too high
-            Deal(objectid=3, deal_amount=2000000, deal_date="2023-01-01", asset_area=65.0, rooms=5.0),  # Rooms too high
-            Deal(objectid=4, deal_amount=3000000, deal_date="2023-01-01", asset_area=65.0, rooms=3.0),  # Price too high
+            Deal(
+                objectid=1, deal_amount=2000000, deal_date="2023-01-01", asset_area=65.0, rooms=3.0
+            ),
+            Deal(
+                objectid=2, deal_amount=2000000, deal_date="2023-01-01", asset_area=80.0, rooms=3.0
+            ),  # Area too high
+            Deal(
+                objectid=3, deal_amount=2000000, deal_date="2023-01-01", asset_area=65.0, rooms=5.0
+            ),  # Rooms too high
+            Deal(
+                objectid=4, deal_amount=3000000, deal_date="2023-01-01", asset_area=65.0, rooms=3.0
+            ),  # Price too high
         ]
 
         # Area filter should exclude deal 2
@@ -701,7 +784,9 @@ class TestMarketAnalysisFunctions:
         assert all(d.objectid in [1, 2, 4] for d in filtered_rooms)
 
         # Price filter should exclude deal 4
-        filtered_price = client.filter_deals_by_criteria(deals, min_price=1500000, max_price=2500000)
+        filtered_price = client.filter_deals_by_criteria(
+            deals, min_price=1500000, max_price=2500000
+        )
         assert len(filtered_price) == 3
         assert all(d.objectid in [1, 2, 3] for d in filtered_price)
 
@@ -709,9 +794,26 @@ class TestMarketAnalysisFunctions:
         """Test that deals with missing data pass through when no filter is active for that field."""
         client = GovmapClient()
         deals = [
-            Deal(objectid=1, deal_amount=1000000, deal_date="2023-01-01", property_type_description="דירה", asset_area=65.0),
-            Deal(objectid=2, deal_amount=1000000, deal_date="2023-01-01", property_type_description="דירה", asset_area=None),
-            Deal(objectid=3, deal_amount=1000000, deal_date="2023-01-01", property_type_description="דירה"),  # Missing asset_area
+            Deal(
+                objectid=1,
+                deal_amount=1000000,
+                deal_date="2023-01-01",
+                property_type_description="דירה",
+                asset_area=65.0,
+            ),
+            Deal(
+                objectid=2,
+                deal_amount=1000000,
+                deal_date="2023-01-01",
+                property_type_description="דירה",
+                asset_area=None,
+            ),
+            Deal(
+                objectid=3,
+                deal_amount=1000000,
+                deal_date="2023-01-01",
+                property_type_description="דירה",
+            ),  # Missing asset_area
         ]
 
         # Filter by property type only - missing area should pass through

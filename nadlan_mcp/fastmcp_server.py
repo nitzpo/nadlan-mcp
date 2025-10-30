@@ -8,10 +8,12 @@ using the FastMCP library with simplified, working functions.
 
 import json
 import logging
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List, Optional
+
 from mcp.server.fastmcp import FastMCP
+
 from nadlan_mcp.govmap import GovmapClient
-from nadlan_mcp.govmap.models import Deal, AutocompleteResponse
+from nadlan_mcp.govmap.models import Deal
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +24,7 @@ mcp = FastMCP("nadlan-mcp")
 
 # Initialize the Govmap client
 client = GovmapClient()
+
 
 def strip_bloat_fields(deals: List[Deal]) -> List[Dict[str, Any]]:
     """
@@ -38,20 +41,21 @@ def strip_bloat_fields(deals: List[Deal]) -> List[Dict[str, Any]]:
     Returns:
         List of deal dictionaries with bloat fields removed
     """
-    bloat_fields = {'shape', 'sourceorder'}
+    bloat_fields = {"shape", "sourceorder"}
     # Note: We keep source_polygon_id if it was added by our processing logic
 
     result = []
     for deal in deals:
         # Convert Deal model to dict, excluding None values for cleaner output
         # Use mode='json' to serialize dates as ISO strings
-        deal_dict = deal.model_dump(mode='json', exclude_none=True)
+        deal_dict = deal.model_dump(mode="json", exclude_none=True)
 
         # Remove bloat fields
         filtered_dict = {k: v for k, v in deal_dict.items() if k not in bloat_fields}
         result.append(filtered_dict)
 
     return result
+
 
 @mcp.tool()
 def autocomplete_address(search_text: str) -> str:
@@ -83,7 +87,7 @@ def autocomplete_address(search_text: str) -> str:
             if result.coordinates:
                 result_dict["coordinates"] = {
                     "longitude": result.coordinates.longitude,
-                    "latitude": result.coordinates.latitude
+                    "latitude": result.coordinates.latitude,
                 }
 
             formatted_results.append(result_dict)
@@ -93,6 +97,7 @@ def autocomplete_address(search_text: str) -> str:
     except Exception as e:
         logger.error(f"Error in autocomplete_address: {e}")
         return f"Error searching for address: {str(e)}"
+
 
 @mcp.tool()
 def get_deals_by_radius(latitude: float, longitude: float, radius_meters: int = 500) -> str:
@@ -117,26 +122,31 @@ def get_deals_by_radius(latitude: float, longitude: float, radius_meters: int = 
         if not polygons:
             return f"No polygons found within {radius_meters}m of coordinates ({latitude}, {longitude})"
 
-        return json.dumps({
-            "total_polygons": len(polygons),
-            "search_radius_meters": radius_meters,
-            "center_coordinates": {"latitude": latitude, "longitude": longitude},
-            "polygons": polygons  # Return dicts directly, no stripping needed
-        }, ensure_ascii=False, indent=2)
+        return json.dumps(
+            {
+                "total_polygons": len(polygons),
+                "search_radius_meters": radius_meters,
+                "center_coordinates": {"latitude": latitude, "longitude": longitude},
+                "polygons": polygons,  # Return dicts directly, no stripping needed
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
 
     except Exception as e:
         logger.error(f"Error in get_deals_by_radius: {e}")
         return f"Error fetching polygons by radius: {str(e)}"
 
+
 @mcp.tool()
 def get_street_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> str:
     """Get real estate deals for a specific street polygon.
-    
+
     Args:
         polygon_id: The polygon ID of the street/area
         limit: Maximum number of deals to return (default: 100)
         deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
-        
+
     Returns:
         JSON string containing recent real estate deals for the street
     """
@@ -150,38 +160,50 @@ def get_street_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> s
         # Add deal type metadata
         for deal in deals:
             deal.deal_type = deal_type
-            deal.deal_type_description = 'first_hand_new' if deal_type == 1 else 'second_hand_used'
+            deal.deal_type_description = "first_hand_new" if deal_type == 1 else "second_hand_used"
 
         # Calculate basic statistics using computed fields from models
-        prices = [deal.deal_amount for deal in deals if deal.deal_amount]
         price_per_sqm_values = [deal.price_per_sqm for deal in deals if deal.price_per_sqm]
-        
+
         stats = {}
         if price_per_sqm_values:
             stats["price_per_sqm_stats"] = {
-                "average_price_per_sqm": round(sum(price_per_sqm_values) / len(price_per_sqm_values), 0),
+                "average_price_per_sqm": round(
+                    sum(price_per_sqm_values) / len(price_per_sqm_values), 0
+                ),
                 "min_price_per_sqm": round(min(price_per_sqm_values), 0),
-                "max_price_per_sqm": round(max(price_per_sqm_values), 0)
+                "max_price_per_sqm": round(max(price_per_sqm_values), 0),
             }
-        
+
         deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
-        return json.dumps({
-            "total_deals": len(deals),
-            "polygon_id": polygon_id,
-            "deal_type": deal_type,
-            "deal_type_description": deal_type_desc,
-            "market_statistics": stats,
-            "deals": strip_bloat_fields(deals)
-        }, ensure_ascii=False, indent=2)
+        return json.dumps(
+            {
+                "total_deals": len(deals),
+                "polygon_id": polygon_id,
+                "deal_type": deal_type,
+                "deal_type_description": deal_type_desc,
+                "market_statistics": stats,
+                "deals": strip_bloat_fields(deals),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
 
     except Exception as e:
         logger.error(f"Error in get_street_deals: {e}")
         return f"Error fetching street deals: {str(e)}"
 
+
 @mcp.tool()
-def find_recent_deals_for_address(address: str, years_back: int = 2, radius_meters: int = 30, max_deals: int = 100, deal_type: int = 2) -> str:
+def find_recent_deals_for_address(
+    address: str,
+    years_back: int = 2,
+    radius_meters: int = 30,
+    max_deals: int = 100,
+    deal_type: int = 2,
+) -> str:
     """Find recent real estate deals for a specific address.
-    
+
     Args:
         address: The address to search for (in Hebrew or English)
         years_back: How many years back to search (default: 2)
@@ -189,12 +211,14 @@ def find_recent_deals_for_address(address: str, years_back: int = 2, radius_mete
                       Small radius since street deals cover the entire street anyway
         max_deals: Maximum number of deals to return (default: 100, provides good context for LLM analysis)
         deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
-        
+
     Returns:
         JSON string containing recent real estate deals for the address
     """
     try:
-        deals = client.find_recent_deals_for_address(address, years_back, radius_meters, max_deals, deal_type)
+        deals = client.find_recent_deals_for_address(
+            address, years_back, radius_meters, max_deals, deal_type
+        )
 
         if not deals:
             deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
@@ -207,74 +231,95 @@ def find_recent_deals_for_address(address: str, years_back: int = 2, radius_mete
 
         # Separate building, street and neighborhood deals for analysis
         # deal_source is added dynamically in find_recent_deals_for_address
-        building_deals = [deal for deal in deals if getattr(deal, "deal_source", None) == "same_building"]
+        building_deals = [
+            deal for deal in deals if getattr(deal, "deal_source", None) == "same_building"
+        ]
         street_deals = [deal for deal in deals if getattr(deal, "deal_source", None) == "street"]
-        neighborhood_deals = [deal for deal in deals if getattr(deal, "deal_source", None) == "neighborhood"]
-        
+        neighborhood_deals = [
+            deal for deal in deals if getattr(deal, "deal_source", None) == "neighborhood"
+        ]
+
         stats = {
             "deal_breakdown": {
                 "total_deals": len(deals),
                 "same_building_deals": len(building_deals),
                 "street_deals": len(street_deals),
                 "neighborhood_deals": len(neighborhood_deals),
-                "same_building_percentage": round((len(building_deals) / len(deals)) * 100, 1) if deals else 0,
-                "street_emphasis_percentage": round((len(street_deals) / len(deals)) * 100, 1) if deals else 0,
-                "neighborhood_percentage": round((len(neighborhood_deals) / len(deals)) * 100, 1) if deals else 0
+                "same_building_percentage": round((len(building_deals) / len(deals)) * 100, 1)
+                if deals
+                else 0,
+                "street_emphasis_percentage": round((len(street_deals) / len(deals)) * 100, 1)
+                if deals
+                else 0,
+                "neighborhood_percentage": round((len(neighborhood_deals) / len(deals)) * 100, 1)
+                if deals
+                else 0,
             }
         }
-        
+
         if prices:
             stats["price_stats"] = {
                 "average_price": round(sum(prices) / len(prices), 0),
                 "min_price": min(prices),
                 "max_price": max(prices),
-                "median_price": sorted(prices)[len(prices)//2] if prices else 0,
-                "total_volume": sum(prices)
+                "median_price": sorted(prices)[len(prices) // 2] if prices else 0,
+                "total_volume": sum(prices),
             }
-        
+
         if areas:
             stats["area_stats"] = {
                 "average_area": round(sum(areas) / len(areas), 1),
                 "min_area": min(areas),
                 "max_area": max(areas),
-                "median_area": sorted(areas)[len(areas)//2] if areas else 0
+                "median_area": sorted(areas)[len(areas) // 2] if areas else 0,
             }
-            
+
         if price_per_sqm_values:
             stats["price_per_sqm_stats"] = {
-                "average_price_per_sqm": round(sum(price_per_sqm_values) / len(price_per_sqm_values), 0),
+                "average_price_per_sqm": round(
+                    sum(price_per_sqm_values) / len(price_per_sqm_values), 0
+                ),
                 "min_price_per_sqm": round(min(price_per_sqm_values), 0),
                 "max_price_per_sqm": round(max(price_per_sqm_values), 0),
-                "median_price_per_sqm": round(sorted(price_per_sqm_values)[len(price_per_sqm_values)//2], 0) if price_per_sqm_values else 0
+                "median_price_per_sqm": round(
+                    sorted(price_per_sqm_values)[len(price_per_sqm_values) // 2], 0
+                )
+                if price_per_sqm_values
+                else 0,
             }
-        
+
         deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
-        return json.dumps({
-            "search_parameters": {
-                "address": address,
-                "years_back": years_back,
-                "radius_meters": radius_meters,
-                "max_deals": max_deals,
-                "deal_type": deal_type,
-                "deal_type_description": deal_type_desc
+        return json.dumps(
+            {
+                "search_parameters": {
+                    "address": address,
+                    "years_back": years_back,
+                    "radius_meters": radius_meters,
+                    "max_deals": max_deals,
+                    "deal_type": deal_type,
+                    "deal_type_description": deal_type_desc,
+                },
+                "market_statistics": stats,
+                "deals": strip_bloat_fields(deals),
             },
-            "market_statistics": stats,
-            "deals": strip_bloat_fields(deals)
-        }, ensure_ascii=False, indent=2)
-        
+            ensure_ascii=False,
+            indent=2,
+        )
+
     except Exception as e:
         logger.error(f"Error in find_recent_deals_for_address: {e}")
         return f"Error analyzing address: {str(e)}"
 
+
 @mcp.tool()
 def get_neighborhood_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> str:
     """Get real estate deals for a specific neighborhood polygon.
-    
+
     Args:
         polygon_id: The polygon ID of the neighborhood
         limit: Maximum number of deals to return (default: 100)
         deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
-        
+
     Returns:
         JSON string containing recent real estate deals in the specified neighborhood
     """
@@ -288,63 +333,79 @@ def get_neighborhood_deals(polygon_id: str, limit: int = 100, deal_type: int = 2
         # Add deal type metadata
         for deal in deals:
             deal.deal_type = deal_type
-            deal.deal_type_description = 'first_hand_new' if deal_type == 1 else 'second_hand_used'
+            deal.deal_type_description = "first_hand_new" if deal_type == 1 else "second_hand_used"
 
         # Calculate basic statistics using computed fields from models
-        prices = [deal.deal_amount for deal in deals if deal.deal_amount]
         price_per_sqm_values = [deal.price_per_sqm for deal in deals if deal.price_per_sqm]
-        
+
         stats = {}
         if price_per_sqm_values:
             stats["price_per_sqm_stats"] = {
-                "average_price_per_sqm": round(sum(price_per_sqm_values) / len(price_per_sqm_values), 0),
+                "average_price_per_sqm": round(
+                    sum(price_per_sqm_values) / len(price_per_sqm_values), 0
+                ),
                 "min_price_per_sqm": round(min(price_per_sqm_values), 0),
-                "max_price_per_sqm": round(max(price_per_sqm_values), 0)
+                "max_price_per_sqm": round(max(price_per_sqm_values), 0),
             }
-        
+
         deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
-        return json.dumps({
-            "total_deals": len(deals),
-            "polygon_id": polygon_id,
-            "deal_type": deal_type,
-            "deal_type_description": deal_type_desc,
-            "market_statistics": stats,
-            "deals": strip_bloat_fields(deals)
-        }, ensure_ascii=False, indent=2)
+        return json.dumps(
+            {
+                "total_deals": len(deals),
+                "polygon_id": polygon_id,
+                "deal_type": deal_type,
+                "deal_type_description": deal_type_desc,
+                "market_statistics": stats,
+                "deals": strip_bloat_fields(deals),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
 
     except Exception as e:
         logger.error(f"Error in get_neighborhood_deals: {e}")
         return f"Error fetching neighborhood deals: {str(e)}"
 
+
 @mcp.tool()
-def analyze_market_trends(address: str, years_back: int = 3, radius_meters: int = 100, max_deals: int = 100, deal_type: int = 2) -> str:
+def analyze_market_trends(
+    address: str,
+    years_back: int = 3,
+    radius_meters: int = 100,
+    max_deals: int = 100,
+    deal_type: int = 2,
+) -> str:
     """Analyze market trends and price patterns for an area with comprehensive data.
-    
+
     Args:
         address: The address to analyze trends around
         years_back: How many years of data to analyze (default: 3)
         radius_meters: Search radius in meters from the address (default: 100, larger for trend analysis)
         max_deals: Maximum number of deals to analyze (default: 100, optimized for performance and token limits)
         deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
-        
+
     Returns:
         JSON string containing comprehensive market trend analysis (summarized data, not raw deals)
     """
     try:
         # Get deals for the address with larger radius for trend analysis
-        deals = client.find_recent_deals_for_address(address, years_back, radius_meters, max_deals, deal_type)
-        
+        deals = client.find_recent_deals_for_address(
+            address, years_back, radius_meters, max_deals, deal_type
+        )
+
         if not deals:
             deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
             return f"No {deal_type_desc} deals found for comprehensive market analysis near '{address}'"
-        
+
         # Efficient analysis with reduced complexity
         from collections import defaultdict
-        
+
         yearly_data = defaultdict(list)
-        property_types: Dict[str, List[float]] = defaultdict(list)  # Store only prices for efficiency
+        property_types: Dict[str, List[float]] = defaultdict(
+            list
+        )  # Store only prices for efficiency
         neighborhoods = defaultdict(list)
-        
+
         # Simplified processing - extract only essential data
         for deal in deals:
             if not deal.deal_date:
@@ -352,167 +413,242 @@ def analyze_market_trends(address: str, years_back: int = 3, radius_meters: int 
 
             # Convert date to string for parsing
             from datetime import date as date_type
-            date_str = deal.deal_date.isoformat() if isinstance(deal.deal_date, date_type) else str(deal.deal_date)
+
+            date_str = (
+                deal.deal_date.isoformat()
+                if isinstance(deal.deal_date, date_type)
+                else str(deal.deal_date)
+            )
             year = date_str[:4]
             price = deal.deal_amount
             area = deal.asset_area
             price_per_sqm = deal.price_per_sqm
-            prop_type = deal.property_type_description or 'לא ידוע'
-            neighborhood = deal.settlement_name_heb or deal.neighborhood or 'לא ידוע'
-            deal_source = getattr(deal, 'deal_source', 'unknown')
-            
-            if isinstance(price, (int, float)) and isinstance(area, (int, float)) and area > 0 and isinstance(price_per_sqm, (int, float)):
-                yearly_data[year].append({
-                    'price': price, 'area': area, 'price_per_sqm': price_per_sqm, 'deal_source': deal_source
-                })
+            prop_type = deal.property_type_description or "לא ידוע"
+            neighborhood = deal.settlement_name_heb or deal.neighborhood or "לא ידוע"
+            deal_source = getattr(deal, "deal_source", "unknown")
+
+            if (
+                isinstance(price, (int, float))
+                and isinstance(area, (int, float))
+                and area > 0
+                and isinstance(price_per_sqm, (int, float))
+            ):
+                yearly_data[year].append(
+                    {
+                        "price": price,
+                        "area": area,
+                        "price_per_sqm": price_per_sqm,
+                        "deal_source": deal_source,
+                    }
+                )
                 property_types[prop_type].append(price_per_sqm)
                 neighborhoods[neighborhood].append(price_per_sqm)
-        
+
         # Calculate streamlined yearly trends
         yearly_trends = {}
         for year, year_deals in yearly_data.items():
             if year_deals:
-                prices = [d['price'] for d in year_deals]
-                price_per_sqm_vals = [d['price_per_sqm'] for d in year_deals]
-                building_deals = [d for d in year_deals if d['deal_source'] == 'same_building']
-                street_deals = [d for d in year_deals if d['deal_source'] == 'street']
-                
+                prices = [d["price"] for d in year_deals]
+                price_per_sqm_vals = [d["price_per_sqm"] for d in year_deals]
+                building_deals = [d for d in year_deals if d["deal_source"] == "same_building"]
+                street_deals = [d for d in year_deals if d["deal_source"] == "street"]
+
                 yearly_trends[year] = {
                     "deal_count": len(year_deals),
                     "same_building_deals": len(building_deals),
                     "street_deals": len(street_deals),
                     "avg_price": round(sum(prices) / len(prices), 0),
-                    "avg_price_per_sqm": round(sum(price_per_sqm_vals) / len(price_per_sqm_vals), 0),
+                    "avg_price_per_sqm": round(
+                        sum(price_per_sqm_vals) / len(price_per_sqm_vals), 0
+                    ),
                     "min_price_per_sqm": round(min(price_per_sqm_vals), 0),
                     "max_price_per_sqm": round(max(price_per_sqm_vals), 0),
-                    "total_volume": sum(prices)
+                    "total_volume": sum(prices),
                 }
-        
+
         # Streamlined property type analysis (top 5 only)
         property_type_analysis = {}
         for prop_type, prices_per_sqm in property_types.items():
             if len(prices_per_sqm) >= 2:  # Only include types with multiple deals
                 property_type_analysis[prop_type] = {
                     "deal_count": len(prices_per_sqm),
-                    "avg_price_per_sqm": round(sum(prices_per_sqm) / len(prices_per_sqm), 0)
+                    "avg_price_per_sqm": round(sum(prices_per_sqm) / len(prices_per_sqm), 0),
                 }
-        
+
         # Keep only top 5 property types by deal count
-        property_type_analysis = dict(sorted(property_type_analysis.items(), 
-                                           key=lambda x: x[1]['deal_count'], reverse=True)[:5])
-        
+        property_type_analysis = dict(
+            sorted(property_type_analysis.items(), key=lambda x: x[1]["deal_count"], reverse=True)[
+                :5
+            ]
+        )
+
         # Streamlined neighborhood analysis (top 5 only)
         neighborhood_analysis = {}
         for neighborhood, prices_per_sqm in neighborhoods.items():
             if len(prices_per_sqm) >= 3:  # Minimum 3 deals for statistical significance
                 neighborhood_analysis[neighborhood] = {
                     "deal_count": len(prices_per_sqm),
-                    "avg_price_per_sqm": round(sum(prices_per_sqm) / len(prices_per_sqm), 0)
+                    "avg_price_per_sqm": round(sum(prices_per_sqm) / len(prices_per_sqm), 0),
                 }
-        
+
         # Keep only top 5 neighborhoods by deal count
-        neighborhood_analysis = dict(sorted(neighborhood_analysis.items(), 
-                                          key=lambda x: x[1]['deal_count'], reverse=True)[:5])
-        
+        neighborhood_analysis = dict(
+            sorted(neighborhood_analysis.items(), key=lambda x: x[1]["deal_count"], reverse=True)[
+                :5
+            ]
+        )
+
         # Simple trend analysis
         years_sorted = sorted(yearly_trends.keys())
         trend_analysis = {}
         if len(years_sorted) >= 2:
             first_year = yearly_trends[years_sorted[0]]
             last_year = yearly_trends[years_sorted[-1]]
-            
-            if first_year['avg_price_per_sqm'] > 0:
-                price_change = ((last_year['avg_price_per_sqm'] - first_year['avg_price_per_sqm']) / first_year['avg_price_per_sqm']) * 100
-                volume_change = ((last_year['deal_count'] - first_year['deal_count']) / first_year['deal_count']) * 100 if first_year['deal_count'] > 0 else 0
-                
+
+            if first_year["avg_price_per_sqm"] > 0:
+                price_change = (
+                    (last_year["avg_price_per_sqm"] - first_year["avg_price_per_sqm"])
+                    / first_year["avg_price_per_sqm"]
+                ) * 100
+                volume_change = (
+                    (
+                        (last_year["deal_count"] - first_year["deal_count"])
+                        / first_year["deal_count"]
+                    )
+                    * 100
+                    if first_year["deal_count"] > 0
+                    else 0
+                )
+
                 trend_analysis = {
                     "price_trend_percentage": round(price_change, 1),
                     "volume_trend_percentage": round(volume_change, 1),
-                    "first_year_avg_price_per_sqm": first_year['avg_price_per_sqm'],
-                    "last_year_avg_price_per_sqm": last_year['avg_price_per_sqm']
+                    "first_year_avg_price_per_sqm": first_year["avg_price_per_sqm"],
+                    "last_year_avg_price_per_sqm": last_year["avg_price_per_sqm"],
                 }
-        
+
         deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
-        
+
         # Return summarized analysis (NO raw deals to save tokens)
-        return json.dumps({
-            "analysis_parameters": {
-                "address": address,
-                "years_analyzed": years_back,
-                "radius_meters": radius_meters,
-                "deals_analyzed": len(deals),
-                "deal_type": deal_type,
-                "deal_type_description": deal_type_desc
+        return json.dumps(
+            {
+                "analysis_parameters": {
+                    "address": address,
+                    "years_analyzed": years_back,
+                    "radius_meters": radius_meters,
+                    "deals_analyzed": len(deals),
+                    "deal_type": deal_type,
+                    "deal_type_description": deal_type_desc,
+                },
+                "market_summary": {
+                    "total_deals": len(deals),
+                    "years_with_data": len(yearly_trends),
+                    "unique_property_types": len(property_type_analysis),
+                    "unique_neighborhoods": len(neighborhood_analysis),
+                },
+                "yearly_trends": yearly_trends,
+                "top_property_types": property_type_analysis,
+                "top_neighborhoods": neighborhood_analysis,
+                "trend_analysis": trend_analysis,
+                "key_insights": {
+                    "most_active_year": max(
+                        yearly_trends.keys(), key=lambda y: yearly_trends[y]["deal_count"]
+                    )
+                    if yearly_trends
+                    else None,
+                    "highest_avg_price_year": max(
+                        yearly_trends.keys(), key=lambda y: yearly_trends[y]["avg_price_per_sqm"]
+                    )
+                    if yearly_trends
+                    else None,
+                    "deal_source_summary": f"Building: {len([d for d in deals if getattr(d, 'deal_source', None) == 'same_building'])}, Street: {len([d for d in deals if getattr(d, 'deal_source', None) == 'street'])}, Neighborhood: {len([d for d in deals if getattr(d, 'deal_source', None) == 'neighborhood'])}",
+                },
             },
-            "market_summary": {
-                "total_deals": len(deals),
-                "years_with_data": len(yearly_trends),
-                "unique_property_types": len(property_type_analysis),
-                "unique_neighborhoods": len(neighborhood_analysis)
-            },
-            "yearly_trends": yearly_trends,
-            "top_property_types": property_type_analysis,
-            "top_neighborhoods": neighborhood_analysis,
-            "trend_analysis": trend_analysis,
-            "key_insights": {
-                "most_active_year": max(yearly_trends.keys(), key=lambda y: yearly_trends[y]['deal_count']) if yearly_trends else None,
-                "highest_avg_price_year": max(yearly_trends.keys(), key=lambda y: yearly_trends[y]['avg_price_per_sqm']) if yearly_trends else None,
-                "deal_source_summary": f"Building: {len([d for d in deals if getattr(d, 'deal_source', None) == 'same_building'])}, Street: {len([d for d in deals if getattr(d, 'deal_source', None) == 'street'])}, Neighborhood: {len([d for d in deals if getattr(d, 'deal_source', None) == 'neighborhood'])}"
-            }
-        }, ensure_ascii=False, indent=2)
-        
+            ensure_ascii=False,
+            indent=2,
+        )
+
     except Exception as e:
         logger.error(f"Error in analyze_market_trends: {e}")
         return f"Error analyzing market trends: {str(e)}"
 
+
 @mcp.tool()
 def compare_addresses(addresses: List[str]) -> str:
     """Compare real estate markets between multiple addresses.
-    
+
     Args:
         addresses: List of addresses to compare (in Hebrew or English)
-        
+
     Returns:
         JSON string containing comparative analysis of multiple addresses
     """
     try:
         comparisons = []
-        
+
         for address in addresses:
             try:
                 deals = client.find_recent_deals_for_address(address, 2)
-                
+
                 if deals:
                     prices = [deal.deal_amount for deal in deals if deal.deal_amount]
                     areas = [deal.asset_area for deal in deals if deal.asset_area]
-                    price_per_sqm_values = [deal.price_per_sqm for deal in deals if deal.price_per_sqm]
-                    building_deals = [deal for deal in deals if getattr(deal, "deal_source", None) == "same_building"]
-                    street_deals = [deal for deal in deals if getattr(deal, "deal_source", None) == "street"]
-                    neighborhood_deals = [deal for deal in deals if getattr(deal, "deal_source", None) == "neighborhood"]
-                    
+                    price_per_sqm_values = [
+                        deal.price_per_sqm for deal in deals if deal.price_per_sqm
+                    ]
+                    building_deals = [
+                        deal
+                        for deal in deals
+                        if getattr(deal, "deal_source", None) == "same_building"
+                    ]
+                    street_deals = [
+                        deal for deal in deals if getattr(deal, "deal_source", None) == "street"
+                    ]
+                    neighborhood_deals = [
+                        deal
+                        for deal in deals
+                        if getattr(deal, "deal_source", None) == "neighborhood"
+                    ]
+
                     comparison = {
                         "address": address,
                         "total_deals": len(deals),
                         "same_building_deals": len(building_deals),
                         "street_deals": len(street_deals),
                         "neighborhood_deals": len(neighborhood_deals),
-                        "same_building_percentage": round((len(building_deals) / len(deals)) * 100, 1) if deals else 0,
-                        "street_emphasis_percentage": round((len(street_deals) / len(deals)) * 100, 1) if deals else 0,
+                        "same_building_percentage": round(
+                            (len(building_deals) / len(deals)) * 100, 1
+                        )
+                        if deals
+                        else 0,
+                        "street_emphasis_percentage": round(
+                            (len(street_deals) / len(deals)) * 100, 1
+                        )
+                        if deals
+                        else 0,
                         "price_stats": {
                             "average_price": round(sum(prices) / len(prices), 0) if prices else 0,
                             "min_price": min(prices) if prices else 0,
-                            "max_price": max(prices) if prices else 0
+                            "max_price": max(prices) if prices else 0,
                         },
                         "area_stats": {
                             "average_area": round(sum(areas) / len(areas), 1) if areas else 0,
                             "min_area": min(areas) if areas else 0,
-                            "max_area": max(areas) if areas else 0
+                            "max_area": max(areas) if areas else 0,
                         },
                         "price_per_sqm_stats": {
-                            "average_price_per_sqm": round(sum(price_per_sqm_values) / len(price_per_sqm_values), 0) if price_per_sqm_values else 0,
-                            "min_price_per_sqm": round(min(price_per_sqm_values), 0) if price_per_sqm_values else 0,
-                            "max_price_per_sqm": round(max(price_per_sqm_values), 0) if price_per_sqm_values else 0
-                        }
+                            "average_price_per_sqm": round(
+                                sum(price_per_sqm_values) / len(price_per_sqm_values), 0
+                            )
+                            if price_per_sqm_values
+                            else 0,
+                            "min_price_per_sqm": round(min(price_per_sqm_values), 0)
+                            if price_per_sqm_values
+                            else 0,
+                            "max_price_per_sqm": round(max(price_per_sqm_values), 0)
+                            if price_per_sqm_values
+                            else 0,
+                        },
                     }
                 else:
                     comparison = {
@@ -525,45 +661,49 @@ def compare_addresses(addresses: List[str]) -> str:
                         "street_emphasis_percentage": 0,
                         "price_stats": {},
                         "area_stats": {},
-                        "price_per_sqm_stats": {}
+                        "price_per_sqm_stats": {},
                     }
-                
+
                 comparisons.append(comparison)
-                
+
             except Exception as e:
                 logger.error(f"Error comparing {address}: {e}")
-                comparisons.append({
-                    "address": address,
-                    "error": str(e)
-                })
-        
+                comparisons.append({"address": address, "error": str(e)})
+
         # Rank addresses by average price per sqm
         valid_comparisons = []
         for comparison in comparisons:
-            if (isinstance(comparison, dict) and 
-                "price_per_sqm_stats" in comparison and 
-                isinstance(comparison["price_per_sqm_stats"], dict) and
-                comparison["price_per_sqm_stats"].get("average_price_per_sqm", 0) > 0):
+            if (
+                isinstance(comparison, dict)
+                and "price_per_sqm_stats" in comparison
+                and isinstance(comparison["price_per_sqm_stats"], dict)
+                and comparison["price_per_sqm_stats"].get("average_price_per_sqm", 0) > 0
+            ):
                 valid_comparisons.append(comparison)
-        
+
         # Sort by price per sqm
         def get_price_per_sqm(comp: dict) -> float:
             price_stats = comp.get("price_per_sqm_stats", {})
             if isinstance(price_stats, dict):
                 return price_stats.get("average_price_per_sqm", 0)
             return 0
-            
+
         valid_comparisons.sort(key=get_price_per_sqm, reverse=True)
-        
-        return json.dumps({
-            "addresses_compared": len(addresses),
-            "ranking_by_average_price_per_sqm": valid_comparisons,
-            "all_results": comparisons
-        }, ensure_ascii=False, indent=2)
-        
+
+        return json.dumps(
+            {
+                "addresses_compared": len(addresses),
+                "ranking_by_average_price_per_sqm": valid_comparisons,
+                "all_results": comparisons,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+
     except Exception as e:
         logger.error(f"Error in compare_addresses: {e}")
         return f"Error comparing addresses: {str(e)}"
+
 
 @mcp.tool()
 def get_valuation_comparables(
@@ -579,7 +719,7 @@ def get_valuation_comparables(
     min_floor: Optional[int] = None,
     max_floor: Optional[int] = None,
     radius_meters: int = 100,
-    max_comparables: int = 50
+    max_comparables: int = 50,
 ) -> str:
     """Get comparable properties for valuation analysis.
 
@@ -609,20 +749,21 @@ def get_valuation_comparables(
     try:
         # Get all deals for the address with higher limits for valuation
         deals = client.find_recent_deals_for_address(
-            address,
-            years_back,
-            radius=radius_meters,
-            max_deals=max_comparables
+            address, years_back, radius=radius_meters, max_deals=max_comparables
         )
-        
+
         if not deals:
-            return json.dumps({
-                "address": address,
-                "years_back": years_back,
-                "comparables": [],
-                "message": "No deals found for this address"
-            }, ensure_ascii=False, indent=2)
-        
+            return json.dumps(
+                {
+                    "address": address,
+                    "years_back": years_back,
+                    "comparables": [],
+                    "message": "No deals found for this address",
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+
         # Apply filters
         filtered_deals = client.filter_deals_by_criteria(
             deals,
@@ -634,30 +775,35 @@ def get_valuation_comparables(
             min_area=min_area,
             max_area=max_area,
             min_floor=min_floor,
-            max_floor=max_floor
+            max_floor=max_floor,
         )
-        
+
         # Calculate statistics on filtered comparables
         stats = client.calculate_deal_statistics(filtered_deals)
 
-        return json.dumps({
-            "address": address,
-            "years_back": years_back,
-            "filters_applied": {
-                "property_type": property_type,
-                "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
-                "price": f"{min_price}-{max_price}" if min_price or max_price else None,
-                "area": f"{min_area}-{max_area}" if min_area or max_area else None,
-                "floor": f"{min_floor}-{max_floor}" if min_floor or max_floor else None,
+        return json.dumps(
+            {
+                "address": address,
+                "years_back": years_back,
+                "filters_applied": {
+                    "property_type": property_type,
+                    "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
+                    "price": f"{min_price}-{max_price}" if min_price or max_price else None,
+                    "area": f"{min_area}-{max_area}" if min_area or max_area else None,
+                    "floor": f"{min_floor}-{max_floor}" if min_floor or max_floor else None,
+                },
+                "total_comparables": len(filtered_deals),
+                "statistics": stats.model_dump(exclude_none=True),  # Serialize DealStatistics model
+                "comparables": strip_bloat_fields(filtered_deals),
             },
-            "total_comparables": len(filtered_deals),
-            "statistics": stats.model_dump(exclude_none=True),  # Serialize DealStatistics model
-            "comparables": strip_bloat_fields(filtered_deals)
-        }, ensure_ascii=False, indent=2)
+            ensure_ascii=False,
+            indent=2,
+        )
 
     except Exception as e:
         logger.error(f"Error in get_valuation_comparables: {e}")
         return f"Error getting valuation comparables: {str(e)}"
+
 
 @mcp.tool()
 def get_deal_statistics(
@@ -665,59 +811,61 @@ def get_deal_statistics(
     years_back: int = 2,
     property_type: Optional[str] = None,
     min_rooms: Optional[float] = None,
-    max_rooms: Optional[float] = None
+    max_rooms: Optional[float] = None,
 ) -> str:
     """Calculate statistical aggregations on deal data for an address.
-    
+
     This tool provides quick statistical summaries without returning all raw deals.
     Useful when LLM needs calculations on large datasets without full details.
-    
+
     Args:
         address: The address to analyze (in Hebrew or English)
         years_back: How many years back to analyze (default: 2)
         property_type: Filter by property type (e.g., "דירה", "בית")
         min_rooms: Minimum number of rooms
         max_rooms: Maximum number of rooms
-        
+
     Returns:
         JSON string containing statistical metrics (mean, median, percentiles, etc.)
     """
     try:
         # Get all deals for the address
         deals = client.find_recent_deals_for_address(address, years_back)
-        
+
         if not deals:
-            return json.dumps({
-                "address": address,
-                "years_back": years_back,
-                "statistics": {
-                    "count": 0,
-                    "message": "No deals found for this address"
-                }
-            }, ensure_ascii=False, indent=2)
-        
+            return json.dumps(
+                {
+                    "address": address,
+                    "years_back": years_back,
+                    "statistics": {"count": 0, "message": "No deals found for this address"},
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+
         # Apply filters if provided
         if property_type or min_rooms or max_rooms:
             deals = client.filter_deals_by_criteria(
-                deals,
-                property_type=property_type,
-                min_rooms=min_rooms,
-                max_rooms=max_rooms
+                deals, property_type=property_type, min_rooms=min_rooms, max_rooms=max_rooms
             )
-        
+
         # Calculate statistics
         stats = client.calculate_deal_statistics(deals)
 
-        return json.dumps({
-            "address": address,
-            "years_back": years_back,
-            "filters_applied": {
-                "property_type": property_type,
-                "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
+        return json.dumps(
+            {
+                "address": address,
+                "years_back": years_back,
+                "filters_applied": {
+                    "property_type": property_type,
+                    "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
+                },
+                "statistics": stats.model_dump(exclude_none=True),  # Serialize DealStatistics model
             },
-            "statistics": stats.model_dump(exclude_none=True)  # Serialize DealStatistics model
-        }, ensure_ascii=False, indent=2)
-        
+            ensure_ascii=False,
+            indent=2,
+        )
+
     except Exception as e:
         logger.error(f"Error in get_deal_statistics: {e}")
         return f"Error calculating deal statistics: {str(e)}"
@@ -741,7 +889,7 @@ def _safe_calculate_metric(metric_func, deals):
     try:
         result = metric_func(deals)
         # Serialize Pydantic model to dict
-        if hasattr(result, 'model_dump'):
+        if hasattr(result, "model_dump"):
             return result.model_dump(exclude_none=True)
         return result
     except ValueError as e:
@@ -749,11 +897,7 @@ def _safe_calculate_metric(metric_func, deals):
 
 
 @mcp.tool()
-def get_market_activity_metrics(
-    address: str,
-    years_back: int = 2,
-    radius_meters: int = 100
-) -> str:
+def get_market_activity_metrics(address: str, years_back: int = 2, radius_meters: int = 100) -> str:
     """Get comprehensive market activity and investment potential analysis.
 
     This tool provides detailed market liquidity, activity scores, and investment
@@ -777,12 +921,16 @@ def get_market_activity_metrics(
         deals = client.find_recent_deals_for_address(address, years_back, radius_meters)
 
         if not deals:
-            return json.dumps({
-                "address": address,
-                "error": "No deals found for analysis",
-                "years_back": years_back,
-                "radius_meters": radius_meters
-            }, ensure_ascii=False, indent=2)
+            return json.dumps(
+                {
+                    "address": address,
+                    "error": "No deals found for analysis",
+                    "years_back": years_back,
+                    "radius_meters": radius_meters,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
 
         # Calculate market metrics using helper to reduce duplication
         activity_metrics = _safe_calculate_metric(client.calculate_market_activity_score, deals)
@@ -790,28 +938,33 @@ def get_market_activity_metrics(
         investment_metrics = _safe_calculate_metric(client.analyze_investment_potential, deals)
 
         # Combine all metrics
-        return json.dumps({
-            "address": address,
-            "years_back": years_back,
-            "radius_meters": radius_meters,
-            "total_deals_analyzed": len(deals),
-            "market_activity": activity_metrics,
-            "market_liquidity": liquidity_metrics,
-            "investment_potential": investment_metrics,
-            "summary": {
-                "activity_score": activity_metrics.get("activity_score"),
-                "activity_trend": activity_metrics.get("trend"),
-                "liquidity_score": liquidity_metrics.get("liquidity_score"),
-                "market_activity_level": liquidity_metrics.get("market_activity_level"),
-                "investment_score": investment_metrics.get("investment_score"),
-                "price_trend": investment_metrics.get("price_trend"),
-                "market_stability": investment_metrics.get("market_stability")
-            }
-        }, ensure_ascii=False, indent=2)
+        return json.dumps(
+            {
+                "address": address,
+                "years_back": years_back,
+                "radius_meters": radius_meters,
+                "total_deals_analyzed": len(deals),
+                "market_activity": activity_metrics,
+                "market_liquidity": liquidity_metrics,
+                "investment_potential": investment_metrics,
+                "summary": {
+                    "activity_score": activity_metrics.get("activity_score"),
+                    "activity_trend": activity_metrics.get("trend"),
+                    "liquidity_score": liquidity_metrics.get("liquidity_score"),
+                    "market_activity_level": liquidity_metrics.get("market_activity_level"),
+                    "investment_score": investment_metrics.get("investment_score"),
+                    "price_trend": investment_metrics.get("price_trend"),
+                    "market_stability": investment_metrics.get("market_stability"),
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
 
     except Exception as e:
         logger.error(f"Error in get_market_activity_metrics: {e}")
         return f"Error analyzing market activity: {str(e)}"
+
 
 # Run the server
 if __name__ == "__main__":

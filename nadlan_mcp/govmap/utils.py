@@ -51,10 +51,7 @@ def is_same_building(search_address: str, deal_address: str) -> bool:
         """Extract street name and number from address"""
         # Remove common prefixes/suffixes and normalize
         addr_clean = (
-            addr.replace("רח'", "")
-            .replace("רחוב", "")
-            .replace("שד'", "")
-            .replace("שדרות", "")
+            addr.replace("רח'", "").replace("רחוב", "").replace("שד'", "").replace("שדרות", "")
         )
         addr_clean = addr_clean.replace("  ", " ").strip()
 

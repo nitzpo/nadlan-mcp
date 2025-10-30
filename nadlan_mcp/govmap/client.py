@@ -6,33 +6,29 @@ Israeli government's Govmap API to retrieve property deals, market trends,
 and real estate information.
 """
 
+from datetime import datetime, timedelta
 import logging
 import time
 from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
 
 import requests
 
 from nadlan_mcp.config import GovmapConfig, get_config
 
+# Import functions from modular package
+from . import filters, market_analysis, statistics, utils, validators
+
 # Import models
 from .models import (
-    Deal,
     AutocompleteResponse,
     AutocompleteResult,
     CoordinatePoint,
+    Deal,
     DealStatistics,
-    MarketActivityScore,
     InvestmentAnalysis,
     LiquidityMetrics,
+    MarketActivityScore,
 )
-
-# Import functions from modular package
-from . import validators
-from . import utils
-from . import filters
-from . import statistics
-from . import market_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -86,9 +82,7 @@ class GovmapClient:
         """Validate coordinate input."""
         return validators.validate_coordinates(point)
 
-    def _validate_positive_int(
-        self, value: int, name: str, max_value: Optional[int] = None
-    ) -> int:
+    def _validate_positive_int(self, value: int, name: str, max_value: Optional[int] = None) -> int:
         """Validate positive integer input."""
         return validators.validate_positive_int(value, name, max_value)
 
@@ -160,24 +154,26 @@ class GovmapClient:
                             coords = coords_str.split()
                             if len(coords) == 2:
                                 coordinates = CoordinatePoint(
-                                    longitude=float(coords[0]),
-                                    latitude=float(coords[1])
+                                    longitude=float(coords[0]), latitude=float(coords[1])
                                 )
                         except (ValueError, IndexError) as e:
-                            logger.warning(f"Failed to parse coordinates from shape: {shape_str}, error: {e}")
+                            logger.warning(
+                                f"Failed to parse coordinates from shape: {shape_str}, error: {e}"
+                            )
 
-                    results.append(AutocompleteResult(
-                        text=result.get("text", ""),
-                        id=result.get("id", ""),
-                        type=result.get("type", ""),
-                        score=result.get("score", 0),
-                        coordinates=coordinates,
-                        shape=shape_str if shape_str else None,
-                    ))
+                    results.append(
+                        AutocompleteResult(
+                            text=result.get("text", ""),
+                            id=result.get("id", ""),
+                            type=result.get("type", ""),
+                            score=result.get("score", 0),
+                            coordinates=coordinates,
+                            shape=shape_str if shape_str else None,
+                        )
+                    )
 
                 return AutocompleteResponse(
-                    resultsCount=data.get("resultsCount", len(results)),
-                    results=results
+                    resultsCount=data.get("resultsCount", len(results)), results=results
                 )
 
             except (requests.RequestException, requests.Timeout) as e:
@@ -196,9 +192,7 @@ class GovmapClient:
                     )
                     raise
         # This line should never be reached but satisfies type checker
-        raise RuntimeError(
-            "Unexpected error: retry loop exited without return or raise"
-        )
+        raise RuntimeError("Unexpected error: retry loop exited without return or raise")
 
     def get_gush_helka(self, point: Tuple[float, float]) -> Dict[str, Any]:
         """
@@ -250,9 +244,7 @@ class GovmapClient:
                     )
                     raise
         # This line should never be reached but satisfies type checker
-        raise RuntimeError(
-            "Unexpected error: retry loop exited without return or raise"
-        )
+        raise RuntimeError("Unexpected error: retry loop exited without return or raise")
 
     def get_deals_by_radius(
         self, point: Tuple[float, float], radius: int = 50
@@ -295,9 +287,7 @@ class GovmapClient:
 
                 data = response.json()
                 if not isinstance(data, list):
-                    raise ValueError(
-                        f"Expected list response, got {type(data).__name__}"
-                    )
+                    raise ValueError(f"Expected list response, got {type(data).__name__}")
 
                 # NOTE: This endpoint returns polygon metadata, not actual deals!
                 # The response contains: dealscount, polygon_id, settlementNameHeb, streetNameHeb, houseNum, objectid
@@ -326,9 +316,7 @@ class GovmapClient:
                     )
                     raise
         # This line should never be reached but satisfies type checker
-        raise RuntimeError(
-            "Unexpected error: retry loop exited without return or raise"
-        )
+        raise RuntimeError("Unexpected error: retry loop exited without return or raise")
 
     def get_street_deals(
         self,
@@ -396,9 +384,7 @@ class GovmapClient:
                 elif isinstance(data, list):
                     deal_dicts = data
                 else:
-                    raise ValueError(
-                        f"Unexpected response format: {type(data).__name__}"
-                    )
+                    raise ValueError(f"Unexpected response format: {type(data).__name__}")
 
                 # Parse each deal dict into Deal model
                 deals = []
@@ -428,9 +414,7 @@ class GovmapClient:
                     )
                     raise
         # This line should never be reached but satisfies type checker
-        raise RuntimeError(
-            "Unexpected error: retry loop exited without return or raise"
-        )
+        raise RuntimeError("Unexpected error: retry loop exited without return or raise")
 
     def get_neighborhood_deals(
         self,
@@ -498,9 +482,7 @@ class GovmapClient:
                 elif isinstance(data, list):
                     deal_dicts = data
                 else:
-                    raise ValueError(
-                        f"Unexpected response format: {type(data).__name__}"
-                    )
+                    raise ValueError(f"Unexpected response format: {type(data).__name__}")
 
                 # Parse each deal dict into Deal model
                 deals = []
@@ -530,9 +512,7 @@ class GovmapClient:
                     )
                     raise
         # This line should never be reached but satisfies type checker
-        raise RuntimeError(
-            "Unexpected error: retry loop exited without return or raise"
-        )
+        raise RuntimeError("Unexpected error: retry loop exited without return or raise")
 
     def find_recent_deals_for_address(
         self,
@@ -573,9 +553,7 @@ class GovmapClient:
 
         try:
             # Step 1: Get coordinates for the address
-            logger.info(
-                f"Starting search for address: {address}, dealType: {deal_type}"
-            )
+            logger.info(f"Starting search for address: {address}, dealType: {deal_type}")
             autocomplete_result = self.autocomplete_address(address)
 
             if not autocomplete_result.results:
@@ -598,7 +576,7 @@ class GovmapClient:
             polygon_ids = set()
             for metadata in nearby_polygons:
                 # Extract polygon_id from dict (these are polygon metadata, not deals)
-                polygon_id = metadata.get('polygon_id')
+                polygon_id = metadata.get("polygon_id")
                 if polygon_id:
                     polygon_ids.add(str(polygon_id))
 
@@ -667,9 +645,7 @@ class GovmapClient:
                             street = deal.street_name or ""
                             house_num = str(deal.house_number or "")
                             deal_address = f"{street} {house_num}".lower().strip()
-                            if self._is_same_building(
-                                search_address_normalized, deal_address
-                            ):
+                            if self._is_same_building(search_address_normalized, deal_address):
                                 deal.deal_source = "same_building"
                                 deal.priority = 0  # Highest priority
                                 building_deals.append(deal)
@@ -698,11 +674,9 @@ class GovmapClient:
 
             # Use stable sort: first by date (newest first), then by priority
             # Since Python's sort is stable, the second sort maintains date order within each priority
+            all_deals.sort(key=lambda x: x.deal_date or "1900-01-01", reverse=True)  # Newest first
             all_deals.sort(
-                key=lambda x: x.deal_date or "1900-01-01", reverse=True
-            )  # Newest first
-            all_deals.sort(
-                key=lambda x: getattr(x, 'priority', 3)
+                key=lambda x: getattr(x, "priority", 3)
             )  # Priority first (0=building, 1=street, 2=neighborhood)
 
             # Limit to max_deals
@@ -799,9 +773,7 @@ class GovmapClient:
         return statistics.calculate_std_dev(values)
 
     # Market analysis methods (delegate to market_analysis module)
-    def _parse_deal_dates(
-        self, deals: List[Deal], time_period_months: Optional[int] = None
-    ):
+    def _parse_deal_dates(self, deals: List[Deal], time_period_months: Optional[int] = None):
         """
         Parse and filter deal dates from a list of deals.
 
@@ -831,13 +803,9 @@ class GovmapClient:
         Returns:
             MarketActivityScore model with activity metrics
         """
-        return market_analysis.calculate_market_activity_score(
-            deals, time_period_months
-        )
+        return market_analysis.calculate_market_activity_score(deals, time_period_months)
 
-    def analyze_investment_potential(
-        self, deals: List[Deal]
-    ) -> InvestmentAnalysis:
+    def analyze_investment_potential(self, deals: List[Deal]) -> InvestmentAnalysis:
         """
         Analyze investment potential based on price trends and market stability.
 

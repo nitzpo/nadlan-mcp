@@ -5,9 +5,8 @@ This module provides pure mathematical functions for analyzing real estate deal 
 """
 
 from collections import Counter
-from typing import List
 import logging
-from datetime import date
+from typing import List
 
 from .models import Deal, DealStatistics
 
@@ -78,7 +77,11 @@ def calculate_deal_statistics(deals: List[Deal]) -> DealStatistics:
         sorted_prices = sorted(prices)
         price_stats = {
             "mean": round(sum(prices) / len(prices), 2),
-            "median": (sorted_prices[len(sorted_prices) // 2] + sorted_prices[(len(sorted_prices) - 1) // 2]) / 2,
+            "median": (
+                sorted_prices[len(sorted_prices) // 2]
+                + sorted_prices[(len(sorted_prices) - 1) // 2]
+            )
+            / 2,
             "min": min(prices),
             "max": max(prices),
             "p25": sorted_prices[len(sorted_prices) // 4],
@@ -123,6 +126,7 @@ def calculate_deal_statistics(deals: List[Deal]) -> DealStatistics:
         try:
             # Convert dates to ISO strings for consistent formatting
             from datetime import date as date_type
+
             parsed_dates = []
             for d in deal_dates:
                 try:
@@ -133,8 +137,8 @@ def calculate_deal_statistics(deals: List[Deal]) -> DealStatistics:
                         # Handle string dates
                         date_str = str(d)
                         # Handle ISO format with timezone (e.g., "2025-01-01T00:00:00.000Z")
-                        if 'T' in date_str:
-                            date_str = date_str.split('T')[0]
+                        if "T" in date_str:
+                            date_str = date_str.split("T")[0]
                         parsed_dates.append(date_str)
                 except (ValueError, TypeError):
                     logger.warning(f"Invalid date format: {d}")

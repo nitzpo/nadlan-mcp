@@ -7,4 +7,5 @@ This script runs the FastMCP server for accessing Israeli government real estate
 
 if __name__ == "__main__":
     from nadlan_mcp.fastmcp_server import mcp
-    mcp.run() 
+
+    mcp.run()

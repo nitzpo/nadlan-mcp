@@ -4,15 +4,17 @@ Tests for nadlan_mcp.govmap.market_analysis module.
 Comprehensive tests for market analysis functions.
 """
 
+from datetime import datetime, timedelta
+
 import pytest
-from datetime import date, datetime, timedelta
+
 from nadlan_mcp.govmap.market_analysis import (
-    parse_deal_dates,
-    calculate_market_activity_score,
     analyze_investment_potential,
+    calculate_market_activity_score,
     get_market_liquidity,
+    parse_deal_dates,
 )
-from nadlan_mcp.govmap.models import Deal, MarketActivityScore, InvestmentAnalysis, LiquidityMetrics
+from nadlan_mcp.govmap.models import Deal, InvestmentAnalysis, LiquidityMetrics, MarketActivityScore
 
 
 def get_recent_date(months_ago=0, days_ago=0):
@@ -27,11 +29,36 @@ class TestParseDealDates:
     def sample_deals(self):
         """Create sample deals spanning multiple months (recent dates)."""
         return [
-            Deal(objectid=1, deal_amount=1000000, deal_date=get_recent_date(months_ago=4, days_ago=15), asset_area=80),
-            Deal(objectid=2, deal_amount=1100000, deal_date=get_recent_date(months_ago=4, days_ago=10), asset_area=85),
-            Deal(objectid=3, deal_amount=1200000, deal_date=get_recent_date(months_ago=3, days_ago=20), asset_area=90),
-            Deal(objectid=4, deal_amount=1300000, deal_date=get_recent_date(months_ago=2, days_ago=25), asset_area=95),
-            Deal(objectid=5, deal_amount=1400000, deal_date=get_recent_date(months_ago=1, days_ago=18), asset_area=100),
+            Deal(
+                objectid=1,
+                deal_amount=1000000,
+                deal_date=get_recent_date(months_ago=4, days_ago=15),
+                asset_area=80,
+            ),
+            Deal(
+                objectid=2,
+                deal_amount=1100000,
+                deal_date=get_recent_date(months_ago=4, days_ago=10),
+                asset_area=85,
+            ),
+            Deal(
+                objectid=3,
+                deal_amount=1200000,
+                deal_date=get_recent_date(months_ago=3, days_ago=20),
+                asset_area=90,
+            ),
+            Deal(
+                objectid=4,
+                deal_amount=1300000,
+                deal_date=get_recent_date(months_ago=2, days_ago=25),
+                asset_area=95,
+            ),
+            Deal(
+                objectid=5,
+                deal_amount=1400000,
+                deal_date=get_recent_date(months_ago=1, days_ago=18),
+                asset_area=100,
+            ),
         ]
 
     def test_parse_deal_dates_basic(self, sample_deals):
@@ -60,8 +87,18 @@ class TestParseDealDates:
         """Test parsing with date objects instead of strings."""
         recent = datetime.now().date()
         deals = [
-            Deal(objectid=1, deal_amount=1000000, deal_date=recent - timedelta(days=30), asset_area=80),
-            Deal(objectid=2, deal_amount=1100000, deal_date=recent - timedelta(days=60), asset_area=85),
+            Deal(
+                objectid=1,
+                deal_amount=1000000,
+                deal_date=recent - timedelta(days=30),
+                asset_area=80,
+            ),
+            Deal(
+                objectid=2,
+                deal_amount=1100000,
+                deal_date=recent - timedelta(days=60),
+                asset_area=85,
+            ),
         ]
         deal_dates, monthly, _ = parse_deal_dates(deals)
 
@@ -71,8 +108,18 @@ class TestParseDealDates:
     def test_parse_deal_dates_all_valid(self):
         """Test that all valid dates are parsed."""
         deals = [
-            Deal(objectid=1, deal_amount=1000000, deal_date=get_recent_date(months_ago=1), asset_area=80),
-            Deal(objectid=2, deal_amount=1100000, deal_date=get_recent_date(months_ago=2), asset_area=85),
+            Deal(
+                objectid=1,
+                deal_amount=1000000,
+                deal_date=get_recent_date(months_ago=1),
+                asset_area=80,
+            ),
+            Deal(
+                objectid=2,
+                deal_amount=1100000,
+                deal_date=get_recent_date(months_ago=2),
+                asset_area=85,
+            ),
         ]
         deal_dates, _, _ = parse_deal_dates(deals)
         assert len(deal_dates) == 2
@@ -90,7 +137,12 @@ class TestCalculateMarketActivityScore:
         """Test basic market activity calculation."""
         # Create 12 deals spread across last 12 months
         deals = [
-            Deal(objectid=i, deal_amount=1000000, deal_date=get_recent_date(months_ago=i), asset_area=80)
+            Deal(
+                objectid=i,
+                deal_amount=1000000,
+                deal_date=get_recent_date(months_ago=i),
+                asset_area=80,
+            )
             for i in range(12)
         ]
         score = calculate_market_activity_score(deals, time_period_months=12)
@@ -106,10 +158,15 @@ class TestCalculateMarketActivityScore:
         # Create 120 deals spread across last 10 months = ~12 deals/month (very high)
         deals = []
         for i in range(120):
-            month_ago = (i % 10)
+            month_ago = i % 10
             day = (i % 28) + 1
             deals.append(
-                Deal(objectid=i, deal_amount=1000000, deal_date=get_recent_date(months_ago=month_ago, days_ago=day), asset_area=80)
+                Deal(
+                    objectid=i,
+                    deal_amount=1000000,
+                    deal_date=get_recent_date(months_ago=month_ago, days_ago=day),
+                    asset_area=80,
+                )
             )
         score = calculate_market_activity_score(deals, time_period_months=12)
 
@@ -118,8 +175,18 @@ class TestCalculateMarketActivityScore:
     def test_market_activity_low_volume(self):
         """Test activity score with low volume."""
         deals = [
-            Deal(objectid=1, deal_amount=1000000, deal_date=get_recent_date(months_ago=1), asset_area=80),
-            Deal(objectid=2, deal_amount=1100000, deal_date=get_recent_date(months_ago=6), asset_area=85),
+            Deal(
+                objectid=1,
+                deal_amount=1000000,
+                deal_date=get_recent_date(months_ago=1),
+                asset_area=80,
+            ),
+            Deal(
+                objectid=2,
+                deal_amount=1100000,
+                deal_date=get_recent_date(months_ago=6),
+                asset_area=85,
+            ),
         ]
         score = calculate_market_activity_score(deals, time_period_months=12)
 
@@ -135,7 +202,12 @@ class TestCalculateMarketActivityScore:
             num_deals = i + 1  # Increasing: 1 deal earliest, 12 deals most recent
             for j in range(num_deals):
                 deals.append(
-                    Deal(objectid=len(deals), deal_amount=1000000, deal_date=get_recent_date(months_ago=months_ago, days_ago=j), asset_area=80)
+                    Deal(
+                        objectid=len(deals),
+                        deal_amount=1000000,
+                        deal_date=get_recent_date(months_ago=months_ago, days_ago=j),
+                        asset_area=80,
+                    )
                 )
 
         score = calculate_market_activity_score(deals, time_period_months=12)
@@ -150,7 +222,12 @@ class TestCalculateMarketActivityScore:
             num_deals = 12 - i  # Decreasing: 12 deals earliest, 1 deal most recent
             for j in range(num_deals):
                 deals.append(
-                    Deal(objectid=len(deals), deal_amount=1000000, deal_date=get_recent_date(months_ago=months_ago, days_ago=j), asset_area=80)
+                    Deal(
+                        objectid=len(deals),
+                        deal_amount=1000000,
+                        deal_date=get_recent_date(months_ago=months_ago, days_ago=j),
+                        asset_area=80,
+                    )
                 )
 
         score = calculate_market_activity_score(deals, time_period_months=12)
@@ -160,7 +237,12 @@ class TestCalculateMarketActivityScore:
         """Test trend detection - stable activity."""
         # Same number of deals each month
         deals = [
-            Deal(objectid=i, deal_amount=1000000, deal_date=get_recent_date(months_ago=i), asset_area=80)
+            Deal(
+                objectid=i,
+                deal_amount=1000000,
+                deal_date=get_recent_date(months_ago=i),
+                asset_area=80,
+            )
             for i in range(12)
         ]
         score = calculate_market_activity_score(deals, time_period_months=12)
@@ -171,8 +253,18 @@ class TestCalculateMarketActivityScore:
     def test_market_activity_insufficient_data_for_trend(self):
         """Test trend with insufficient data."""
         deals = [
-            Deal(objectid=1, deal_amount=1000000, deal_date=get_recent_date(months_ago=1), asset_area=80),
-            Deal(objectid=2, deal_amount=1100000, deal_date=get_recent_date(months_ago=2), asset_area=85),
+            Deal(
+                objectid=1,
+                deal_amount=1000000,
+                deal_date=get_recent_date(months_ago=1),
+                asset_area=80,
+            ),
+            Deal(
+                objectid=2,
+                deal_amount=1100000,
+                deal_date=get_recent_date(months_ago=2),
+                asset_area=85,
+            ),
         ]
         score = calculate_market_activity_score(deals, time_period_months=12)
 
@@ -198,7 +290,12 @@ class TestCalculateMarketActivityScore:
             month_ago = i % months
             day = (i // months) % 28
             deals.append(
-                Deal(objectid=i, deal_amount=1000000, deal_date=get_recent_date(months_ago=month_ago, days_ago=day), asset_area=80)
+                Deal(
+                    objectid=i,
+                    deal_amount=1000000,
+                    deal_date=get_recent_date(months_ago=month_ago, days_ago=day),
+                    asset_area=80,
+                )
             )
         score = calculate_market_activity_score(deals, time_period_months=12)
 
@@ -212,9 +309,15 @@ class TestAnalyzeInvestmentPotential:
         """Test basic investment analysis."""
         # Create deals with increasing prices
         deals = [
-            Deal(objectid=1, deal_amount=1000000, deal_date="2024-01-01", asset_area=100),  # 10000/sqm
-            Deal(objectid=2, deal_amount=1100000, deal_date="2024-02-01", asset_area=100),  # 11000/sqm
-            Deal(objectid=3, deal_amount=1200000, deal_date="2024-03-01", asset_area=100),  # 12000/sqm
+            Deal(
+                objectid=1, deal_amount=1000000, deal_date="2024-01-01", asset_area=100
+            ),  # 10000/sqm
+            Deal(
+                objectid=2, deal_amount=1100000, deal_date="2024-02-01", asset_area=100
+            ),  # 11000/sqm
+            Deal(
+                objectid=3, deal_amount=1200000, deal_date="2024-03-01", asset_area=100
+            ),  # 12000/sqm
         ]
         analysis = analyze_investment_potential(deals)
 
@@ -253,7 +356,12 @@ class TestAnalyzeInvestmentPotential:
         """Test volatility calculation with low volatility."""
         # Prices very similar
         deals = [
-            Deal(objectid=i, deal_amount=1000000 + i*1000, deal_date=f"2024-{i+1:02d}-01", asset_area=100)
+            Deal(
+                objectid=i,
+                deal_amount=1000000 + i * 1000,
+                deal_date=f"2024-{i + 1:02d}-01",
+                asset_area=100,
+            )
             for i in range(5)
         ]
         analysis = analyze_investment_potential(deals)
@@ -278,7 +386,12 @@ class TestAnalyzeInvestmentPotential:
     def test_investment_analysis_data_quality_excellent(self):
         """Test data quality assessment with excellent data."""
         deals = [
-            Deal(objectid=i, deal_amount=1000000, deal_date=f"2024-{(i%12)+1:02d}-01", asset_area=100)
+            Deal(
+                objectid=i,
+                deal_amount=1000000,
+                deal_date=f"2024-{(i % 12) + 1:02d}-01",
+                asset_area=100,
+            )
             for i in range(25)
         ]
         analysis = analyze_investment_potential(deals)
@@ -334,7 +447,7 @@ class TestAnalyzeInvestmentPotential:
     def test_investment_analysis_price_trends(self, price_changes, expected_trend):
         """Parametrized test for price trend detection."""
         deals = [
-            Deal(objectid=i, deal_amount=price, deal_date=f"2024-{i+1:02d}-01", asset_area=100)
+            Deal(objectid=i, deal_amount=price, deal_date=f"2024-{i + 1:02d}-01", asset_area=100)
             for i, price in enumerate(price_changes)
         ]
         analysis = analyze_investment_potential(deals)
@@ -348,7 +461,12 @@ class TestGetMarketLiquidity:
     def test_market_liquidity_basic(self):
         """Test basic liquidity calculation."""
         deals = [
-            Deal(objectid=i, deal_amount=1000000, deal_date=get_recent_date(months_ago=i), asset_area=80)
+            Deal(
+                objectid=i,
+                deal_amount=1000000,
+                deal_date=get_recent_date(months_ago=i),
+                asset_area=80,
+            )
             for i in range(12)
         ]
         liquidity = get_market_liquidity(deals, time_period_months=12)
@@ -367,7 +485,12 @@ class TestGetMarketLiquidity:
             month_ago = i % 10
             day = (i % 28) + 1
             deals.append(
-                Deal(objectid=i, deal_amount=1000000, deal_date=get_recent_date(months_ago=month_ago, days_ago=day), asset_area=80)
+                Deal(
+                    objectid=i,
+                    deal_amount=1000000,
+                    deal_date=get_recent_date(months_ago=month_ago, days_ago=day),
+                    asset_area=80,
+                )
             )
         liquidity = get_market_liquidity(deals, time_period_months=12)
 
@@ -377,8 +500,18 @@ class TestGetMarketLiquidity:
     def test_market_liquidity_low(self):
         """Test low liquidity."""
         deals = [
-            Deal(objectid=1, deal_amount=1000000, deal_date=get_recent_date(months_ago=1), asset_area=80),
-            Deal(objectid=2, deal_amount=1100000, deal_date=get_recent_date(months_ago=6), asset_area=85),
+            Deal(
+                objectid=1,
+                deal_amount=1000000,
+                deal_date=get_recent_date(months_ago=1),
+                asset_area=80,
+            ),
+            Deal(
+                objectid=2,
+                deal_amount=1100000,
+                deal_date=get_recent_date(months_ago=6),
+                asset_area=85,
+            ),
         ]
         liquidity = get_market_liquidity(deals, time_period_months=12)
 
@@ -389,7 +522,12 @@ class TestGetMarketLiquidity:
         """Test deal velocity calculation."""
         # 12 deals spread evenly across 12 months
         deals = [
-            Deal(objectid=i, deal_amount=1000000, deal_date=get_recent_date(months_ago=i), asset_area=80)
+            Deal(
+                objectid=i,
+                deal_amount=1000000,
+                deal_date=get_recent_date(months_ago=i),
+                asset_area=80,
+            )
             for i in range(12)
         ]
         liquidity = get_market_liquidity(deals, time_period_months=12)
@@ -420,7 +558,12 @@ class TestGetMarketLiquidity:
             month_ago = i % months
             day = (i // months) % 28
             deals.append(
-                Deal(objectid=i, deal_amount=1000000, deal_date=get_recent_date(months_ago=month_ago, days_ago=day), asset_area=80)
+                Deal(
+                    objectid=i,
+                    deal_amount=1000000,
+                    deal_date=get_recent_date(months_ago=month_ago, days_ago=day),
+                    asset_area=80,
+                )
             )
         liquidity = get_market_liquidity(deals, time_period_months=12)
 

@@ -15,46 +15,45 @@ Public API:
 """
 
 # Pydantic models
-from .models import (
-    CoordinatePoint,
-    Address,
-    AutocompleteResult,
-    AutocompleteResponse,
-    Deal,
-    DealStatistics,
-    MarketActivityScore,
-    InvestmentAnalysis,
-    LiquidityMetrics,
-    DealFilters,
-)
+# Main API client
+from .client import GovmapClient
 
 # Filter functions
 from .filters import filter_deals_by_criteria
 
-# Statistics functions
-from .statistics import calculate_deal_statistics, calculate_std_dev
-
 # Market analysis functions
 from .market_analysis import (
-    calculate_market_activity_score,
     analyze_investment_potential,
+    calculate_market_activity_score,
     get_market_liquidity,
     parse_deal_dates,
 )
+from .models import (
+    Address,
+    AutocompleteResponse,
+    AutocompleteResult,
+    CoordinatePoint,
+    Deal,
+    DealFilters,
+    DealStatistics,
+    InvestmentAnalysis,
+    LiquidityMetrics,
+    MarketActivityScore,
+)
+
+# Statistics functions
+from .statistics import calculate_deal_statistics, calculate_std_dev
 
 # Utility functions
-from .utils import calculate_distance, is_same_building, extract_floor_number
+from .utils import calculate_distance, extract_floor_number, is_same_building
 
 # Validation functions
 from .validators import (
     validate_address,
     validate_coordinates,
-    validate_positive_int,
     validate_deal_type,
+    validate_positive_int,
 )
-
-# Main API client
-from .client import GovmapClient
 
 __all__ = [
     # Main client class

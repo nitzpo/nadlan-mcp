@@ -173,7 +173,7 @@ Each tool should offer:
 ```python
 @mcp.tool()
 def find_recent_deals_for_address(
-    address: str, 
+    address: str,
     years_back: int = 2,
     summarized_response: bool = False  # Default: structured/detailed
 ) -> str:

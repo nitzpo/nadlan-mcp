@@ -57,16 +57,18 @@ def validate_coordinates(point: Tuple[float, float]) -> Tuple[float, float]:
     # Basic validation for Israeli coordinates (ITM projection)
     # ITM bounds for Israel: X (longitude) ~150,000-300,000, Y (latitude) ~3,500,000-4,000,000
     if not (150000 <= lon <= 300000):  # ITM longitude bounds for Israel
-        logger.warning(f"Longitude {lon} appears to be outside Israeli ITM bounds (150,000-300,000)")
+        logger.warning(
+            f"Longitude {lon} appears to be outside Israeli ITM bounds (150,000-300,000)"
+        )
     if not (3500000 <= lat <= 4000000):  # ITM latitude bounds for Israel
-        logger.warning(f"Latitude {lat} appears to be outside Israeli ITM bounds (3,500,000-4,000,000)")
+        logger.warning(
+            f"Latitude {lat} appears to be outside Israeli ITM bounds (3,500,000-4,000,000)"
+        )
 
     return (lon, lat)
 
 
-def validate_positive_int(
-    value: int, name: str, max_value: Optional[int] = None
-) -> int:
+def validate_positive_int(value: int, name: str, max_value: Optional[int] = None) -> int:
     """
     Validate positive integer input.
 

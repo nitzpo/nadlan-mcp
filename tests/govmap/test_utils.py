@@ -4,11 +4,10 @@ Unit tests for utils module.
 Tests helper utilities including distance calculation, address matching, and floor parsing.
 """
 
-import pytest
 from nadlan_mcp.govmap.utils import (
     calculate_distance,
-    is_same_building,
     extract_floor_number,
+    is_same_building,
 )
 
 

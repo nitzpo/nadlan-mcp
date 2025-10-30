@@ -12,16 +12,16 @@ Nadlan-MCP is a Model Context Protocol (MCP) server that provides Israeli real e
 
 **See USECASES.md for the complete feature roadmap and user-facing capabilities.**
 
-### Current Capabilities (✅ Implemented)
+### Current Capabilities (✅ Implemented - All 10 MCP Tools)
 - **Address & Location Services** - Address autocomplete, location-based deal search
-- **Real Estate Deal Analysis** - Recent deals, street/neighborhood analysis, filtering
-- **Market Intelligence** - Trend analysis, price per sqm tracking
+- **Real Estate Deal Analysis** - Recent deals, street/neighborhood analysis, enhanced filtering
+- **Market Intelligence** - Trend analysis, price per sqm tracking, market activity metrics
 - **Comparative Analysis** - Multi-address comparison, investment insights
+- **Valuation Data** - Comparable properties, deal statistics, filtered deal sets
+- **Enhanced Filtering** - Property type, rooms, price range, area, floor (all deal functions)
 
 ### In Development (🚧 In Progress)
-- Enhanced deal filtering (property type, rooms, price range, area, floor)
-- Valuation data provision tools (`get_valuation_comparables`, `get_deal_statistics`)
-- Market activity metrics (detailed activity and velocity metrics)
+- Phase 6-7: Documentation improvements, code quality with Ruff/mypy, pre-commit hooks
 
 ### Future Features (📋 Planned)
 - **Amenity Scoring** - Comprehensive quality-of-life analysis using:
@@ -72,17 +72,23 @@ pytest -m integration
 ### Code Quality
 
 ```bash
-# Format code with black
-black nadlan_mcp/ tests/
+# Format code with Ruff (replaces black + isort)
+ruff format .
 
-# Sort imports
-isort nadlan_mcp/ tests/
+# Lint code with Ruff (replaces flake8 + many more)
+ruff check .
 
-# Type checking
+# Lint with auto-fix
+ruff check . --fix
+
+# Type checking with mypy (currently has type annotation issues - WIP)
 mypy nadlan_mcp/
 
-# Linting
-flake8 nadlan_mcp/
+# Run all pre-commit hooks manually (for CI, not installed locally)
+pre-commit run --all-files
+
+# Note: Pre-commit hooks run as PR checks in GitHub Actions, not locally
+# This allows commits without blocking, with checks shown in PRs
 ```
 
 ## Architecture
@@ -147,7 +153,7 @@ The codebase follows a four-layer architecture:
 
 ## Available MCP Tools
 
-**Implemented (✅):**
+**Implemented (✅ All 10 Tools):**
 - `autocomplete_address` - Search and autocomplete Israeli addresses
 - `get_deals_by_radius` - Get deals within a radius of coordinates
 - `get_street_deals` - Get deals for a specific street polygon
@@ -155,8 +161,6 @@ The codebase follows a four-layer architecture:
 - `find_recent_deals_for_address` - Main comprehensive analysis tool
 - `analyze_market_trends` - Analyze market trends and price patterns
 - `compare_addresses` - Compare real estate markets between multiple addresses
-
-**In Progress (🚧):**
 - `get_valuation_comparables` - Get comparable properties for valuation analysis
 - `get_deal_statistics` - Calculate statistical aggregations on deal data
 - `get_market_activity_metrics` - Detailed market activity and velocity metrics
