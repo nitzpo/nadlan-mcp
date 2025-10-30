@@ -83,11 +83,11 @@ def is_same_building(search_address: str, deal_address: str) -> bool:
         return True
 
     # Check if one address is contained in the other (for different formats of same address)
-    if len(search_address) > 5 and len(deal_address) > 5:
-        if search_address in deal_address or deal_address in search_address:
-            return True
-
-    return False
+    return (
+        len(search_address) > 5
+        and len(deal_address) > 5
+        and (search_address in deal_address or deal_address in search_address)
+    )
 
 
 def extract_floor_number(floor_str: str) -> int | None:
