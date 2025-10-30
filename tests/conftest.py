@@ -77,18 +77,3 @@ def vcr_cassette(request):
     cassette_name = f"{request.module.__name__}.{test_name}"
 
     return my_vcr.use_cassette(cassette_name)
-
-
-@pytest.fixture
-def vcr_enabled():
-    """
-    Fixture that enables VCR for the entire test function.
-
-    Usage:
-        @pytest.mark.usefixtures('vcr_enabled')
-        def test_something():
-            # All HTTP calls automatically recorded/replayed
-            response = requests.get("...")
-    """
-    # This is handled by pytest-vcr plugin or manual context manager
-    pass

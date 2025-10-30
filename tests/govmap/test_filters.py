@@ -82,12 +82,6 @@ class TestFilterDealsByCriteria:
         assert len(result) == 3
         assert set(d.objectid for d in result) == {1, 2, 4}
 
-    def test_filter_by_property_type_case_insensitive(self, sample_deals):
-        """Test that property type filtering is case-insensitive."""
-        result = filter_deals_by_criteria(sample_deals, property_type="דירה")
-        result_upper = filter_deals_by_criteria(sample_deals, property_type="דירה")
-        assert len(result) == len(result_upper)
-
     def test_filter_by_min_rooms(self, sample_deals):
         """Test filtering by minimum rooms."""
         result = filter_deals_by_criteria(sample_deals, min_rooms=4.0)
