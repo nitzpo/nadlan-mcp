@@ -91,10 +91,20 @@ def filter_deals_by_criteria(
             property_type_normalized = property_type.lower().strip()
             deal_type_normalized = deal_type.lower().strip()
 
-            # Check if the filter term appears in the deal type
+            # Handle Hebrew feminine ending variations (ה ↔ ת)
+            # If the filter term ends with ה, also check for the ת variant
             # This allows "דירה" to match "דירת גג", "דירה בבניין", etc.
-            if property_type_normalized not in deal_type_normalized:
-                continue
+            if property_type_normalized.endswith('ה'):
+                property_type_variant = property_type_normalized[:-1] + 'ת'
+                if property_type_variant in deal_type_normalized:
+                    # Found variant match, continue to next filter
+                    pass
+                elif property_type_normalized in deal_type_normalized:
+                    # Found original match, continue to next filter
+                    pass
+                else:
+                    # No match found for either variant
+                    continue
 
         # Room count filter
         if min_rooms is not None or max_rooms is not None:
