@@ -167,10 +167,11 @@ class TestFilterDealsByCriteria:
             min_price=1000000.0,
             max_price=1500000.0,
         )
-        # Should match only objectid=1 (דירה with 3 rooms, price 1M)
-        # objectid=2 is "דירת גג" not "דירה", so filtered out
-        assert len(result) == 1
-        assert set(d.objectid for d in result) == {1}
+        # Should match objectid=1 and objectid=2
+        # objectid=1: "דירה", 3 rooms, 1M price ✓
+        # objectid=2: "דירת גג" (matches "דירה" variant), 4 rooms, 1.5M price ✓
+        assert len(result) == 2
+        assert set(d.objectid for d in result) == {1, 2}
 
     def test_filter_using_dealfilters_model(self, sample_deals):
         """Test filtering using DealFilters model."""
@@ -178,10 +179,11 @@ class TestFilterDealsByCriteria:
             property_type="דירה", min_rooms=3.0, max_rooms=4.0
         )
         result = filter_deals_by_criteria(sample_deals, filters=filters)
-        # Should match only objectid=1 (דירה with 3 rooms)
-        # objectid=2 is "דירת גג" not exact match
-        assert len(result) == 1
-        assert set(d.objectid for d in result) == {1}
+        # Should match objectid=1 and objectid=2
+        # objectid=1: "דירה", 3 rooms ✓
+        # objectid=2: "דירת גג" (matches "דירה" variant), 4 rooms ✓
+        assert len(result) == 2
+        assert set(d.objectid for d in result) == {1, 2}
 
     def test_filter_using_dict(self, sample_deals):
         """Test filtering using dict (converted to DealFilters)."""
@@ -191,9 +193,11 @@ class TestFilterDealsByCriteria:
             "max_rooms": 4.0,
         }
         result = filter_deals_by_criteria(sample_deals, filters=filters_dict)
-        # Should match only objectid=1
-        assert len(result) == 1
-        assert set(d.objectid for d in result) == {1}
+        # Should match objectid=1 and objectid=2
+        # objectid=1: "דירה", 3 rooms ✓
+        # objectid=2: "דירת גג" (matches "דירה" variant), 4 rooms ✓
+        assert len(result) == 2
+        assert set(d.objectid for d in result) == {1, 2}
 
     def test_individual_params_override_filters_model(self, sample_deals):
         """Test that individual parameters override filters model."""

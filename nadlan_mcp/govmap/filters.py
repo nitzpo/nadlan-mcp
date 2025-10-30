@@ -96,14 +96,12 @@ def filter_deals_by_criteria(
             # This allows "דירה" to match "דירת גג", "דירה בבניין", etc.
             if property_type_normalized.endswith('ה'):
                 property_type_variant = property_type_normalized[:-1] + 'ת'
-                if property_type_variant in deal_type_normalized:
-                    # Found variant match, continue to next filter
-                    pass
-                elif property_type_normalized in deal_type_normalized:
-                    # Found original match, continue to next filter
-                    pass
-                else:
+                if property_type_variant not in deal_type_normalized and property_type_normalized not in deal_type_normalized:
                     # No match found for either variant
+                    continue
+            else:
+                # For non-ה endings, do substring match
+                if property_type_normalized not in deal_type_normalized:
                     continue
 
         # Room count filter
