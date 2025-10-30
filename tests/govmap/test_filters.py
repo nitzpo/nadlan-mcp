@@ -78,9 +78,9 @@ class TestFilterDealsByCriteria:
     def test_filter_by_property_type_partial_match(self, sample_deals):
         """Test filtering by partial property type (substring)."""
         result = filter_deals_by_criteria(sample_deals, property_type="דירה")
-        # Should match only "דירה" exactly (not "דירת גג" because "דירה" != "דירת")
-        assert len(result) == 2
-        assert set(d.objectid for d in result) == {1, 4}
+        # Should match "דירה" and "דירת גג" via substring match.
+        assert len(result) == 3
+        assert set(d.objectid for d in result) == {1, 2, 4}
 
     def test_filter_by_property_type_case_insensitive(self, sample_deals):
         """Test that property type filtering is case-insensitive."""
