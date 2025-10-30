@@ -2,51 +2,69 @@
 
 ## Overview
 
-Nadlan-MCP uses a three-tier testing approach:
-1. **Fast unit tests** - Cached fixtures, run in <1s (default)
+Nadlan-MCP uses a multi-tier testing approach:
+1. **Fast unit tests** - Mocked/fixture-based, run in ~12s (default)
 2. **E2E smoke tests** - Minimal API calls, run in ~5s (verify API works)
 3. **Comprehensive E2E tests** - Full API coverage, run in ~5min (optional)
+4. **API health checks** - Weekly API monitoring, run on-demand
 
 ## Running Tests
 
-### Default: Fast Unit Tests Only
+### Default: Fast Tests (Excludes API Health Checks)
 ```bash
-pytest tests/ --ignore=tests/e2e/
-# Result: 180 passed, 1 skipped in 0.39s
+pytest tests/ -m "not api_health"
+# Result: 303 passed, 1 skipped in ~12s
+```
+
+### All Tests Including API Health
+```bash
+pytest tests/
+# Result: 313 passed, 1 skipped in ~15s (if API health checks pass)
+```
+
+### API Health Checks Only (Weekly)
+```bash
+pytest -m api_health -v
+# Result: 10 passed (verifies Govmap API is working)
 ```
 
 ### E2E Smoke Tests (Fast)
 ```bash
-pytest tests/e2e/test_mcp_tools.py -m integration
+pytest tests/e2e/test_mcp_tools.py
 # Result: 4 passed in 4.77s
 ```
 
 ### Comprehensive E2E Tests (Slow - Optional)
 ```bash
-pytest tests/e2e/test_mcp_tools_comprehensive.py -m integration
+pytest tests/e2e/test_mcp_tools_comprehensive.py
 # Result: 11 passed in 5m36s
 ```
 
-### All Tests
+### With Coverage Report
 ```bash
-pytest tests/
+pytest tests/ -m "not api_health" --cov=nadlan_mcp --cov-report=term-missing
+# Result: 84% coverage
 ```
 
 ## Test Structure
 
 ### Fast Unit Tests (`tests/`)
-- **174 tests** covering all core functionality
-- Use cached API responses from `tests/fixtures/`
-- Mock `GovmapClient` to avoid real API calls
-- Run in **0.39 seconds**
+- **304 tests** covering all core functionality
+- Use mocked responses and fixtures
+- Run in **~12 seconds**
 
 Key test files:
+- `tests/govmap/test_filters.py` - Deal filtering (36 tests)
+- `tests/govmap/test_statistics.py` - Statistical calculations (32 tests)
+- `tests/govmap/test_market_analysis.py` - Market analysis (40 tests)
 - `tests/govmap/test_models.py` - Pydantic model validation (36 tests)
-- `tests/govmap/test_utils.py` - Helper functions (45 tests)
-- `tests/govmap/test_validators.py` - Input validation (24 tests)
-- `tests/test_govmap_client.py` - Client and business logic (41 tests)
+- `tests/govmap/test_utils.py` - Helper functions (42 tests)
+- `tests/govmap/test_validators.py` - Input validation (32 tests)
+- `tests/test_govmap_client.py` - Client and business logic (34 tests)
 - `tests/test_fastmcp_tools.py` - MCP tool integration (22 tests)
-- `tests/test_mcp_tools_fast.py` - Fast MCP tool tests with fixtures (6 tests)
+- `tests/test_mcp_tools_fast.py` - Fast MCP tool tests (7 tests)
+- `tests/e2e/test_mcp_tools.py` - Smoke tests (4 tests)
+- `tests/e2e/test_mcp_tools_comprehensive.py` - Comprehensive E2E (11 tests)
 
 ### E2E Smoke Tests (`tests/e2e/test_mcp_tools.py`)
 - **4 minimal smoke tests** with real API calls
@@ -61,50 +79,80 @@ Key test files:
 - Catch API contract changes
 - Run in **5min 36sec** (optional, use for releases)
 
-## Fixtures
+### API Health Checks (`tests/api_health/`)
+- **10 health check tests** for weekly API monitoring
+- Verify Govmap API is functioning correctly
+- Check response structure, data quality, and performance
+- Marked with `@pytest.mark.api_health`
+- **Does not run by default** - must be explicitly requested
+- See `tests/api_health/README.md` for details
 
-Cached API responses in `tests/fixtures/`:
+## Fixtures & Mocking
+
+### Fixtures (`tests/fixtures/`)
+Cached API responses for fast tests:
 - `autocomplete_response.json` - Address search results
 - `street_deals.json` - Street-level deal data
 - `neighborhood_deals.json` - Neighborhood-level deal data
 - `polygon_metadata.json` - Polygon metadata from radius search
 
-These fixtures are generated from real API calls and updated as needed.
+### VCR.py Integration
+VCR.py is configured for recording/replaying HTTP interactions:
+- Configuration: `tests/vcr_config.py`
+- Cassettes stored in: `tests/cassettes/`
+- Fixture: `vcr_cassette` available in `tests/conftest.py`
+- Record mode: `once` (record first run, replay after)
+
+Example usage:
+```python
+def test_something(vcr_cassette):
+    with vcr_cassette:
+        # HTTP calls recorded/replayed here
+        response = client.autocomplete_address("תל אביב")
+```
 
 ## Test Markers
 
 Configured in `pytest.ini`:
 - `@pytest.mark.integration` - Slow tests requiring real API calls
 - `@pytest.mark.unit` - Fast unit tests (default)
+- `@pytest.mark.api_health` - Weekly API health checks (run separately)
 
 ## Performance Comparison
 
 | Test Suite | Count | Duration | Speed |
 |------------|-------|----------|-------|
-| Fast unit tests | 180 | 0.39s | 462 tests/sec |
+| Fast unit tests | 304 | 12s | 25 tests/sec |
 | E2E smoke tests | 4 | 4.77s | 0.84 tests/sec |
 | Comprehensive E2E | 11 | 5m36s | 0.033 tests/sec |
+| API health checks | 10 | ~5-10s | 1-2 tests/sec |
 
-**Unit tests are 12x faster than smoke tests, 860x faster than comprehensive E2E!**
+**Unit tests are 30x faster than smoke tests, 750x faster than comprehensive E2E!**
 
 ## CI/CD Recommendations
 
-### PR Checks (~5s)
+### PR Checks (~12s)
 ```bash
-# Run unit tests + smoke tests
-pytest tests/ --ignore=tests/e2e/test_mcp_tools_comprehensive.py
+# Run fast tests only (excludes API health and comprehensive E2E)
+pytest tests/ -m "not api_health" --ignore=tests/e2e/test_mcp_tools_comprehensive.py
 ```
 
 ### Nightly Build (~6min)
 ```bash
-# Run all tests including comprehensive E2E
-pytest tests/
+# Run all tests except API health
+pytest tests/ -m "not api_health"
 ```
 
-### Quick Verification (<5s)
+### Weekly API Health (~10s)
 ```bash
-# Just smoke tests to verify API works
-pytest tests/e2e/test_mcp_tools.py -m integration
+# Run API health checks to verify Govmap API
+pytest -m api_health -v
+```
+
+### Full Test Suite (~6min)
+```bash
+# Run everything including comprehensive E2E and API health
+pytest tests/
 ```
 
 ## Updating Fixtures

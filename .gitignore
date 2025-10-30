@@ -296,4 +296,6 @@ nadlan_mcp/local_settings.py
 # Claude Code workspace and local config
 .claude/
 .mcp.json
-PHASE3-PLAN-SUMMARY.md
+
+# Phase summaries should stay in .cursor/plans/ only
+PHASE*.md

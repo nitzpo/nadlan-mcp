@@ -476,6 +476,34 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 ```
 
+## Testing
+
+Nadlan-MCP has comprehensive test coverage with 304 tests achieving 84% code coverage.
+
+### Running Tests
+
+```bash
+# Run all fast tests (default - excludes API health checks)
+pytest tests/ -m "not api_health"
+# Result: 303 passed, 1 skipped in ~12s
+
+# Run with coverage report
+pytest tests/ -m "not api_health" --cov=nadlan_mcp --cov-report=term-missing
+
+# Run API health checks (weekly monitoring)
+pytest -m api_health -v
+```
+
+### Test Structure
+
+- **304 tests total** with 84% coverage
+- **Fast unit tests** - Mocked/fixture-based (~12s)
+- **E2E smoke tests** - Minimal API calls (~5s)
+- **Comprehensive E2E** - Full API coverage (~5min, optional)
+- **API health checks** - Weekly API monitoring (10 tests, run on-demand)
+
+See `TESTING.md` for detailed testing documentation.
+
 ## Dependencies
 
 - **requests**: HTTP library for API calls
