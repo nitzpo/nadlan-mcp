@@ -1,19 +1,19 @@
-# Development dependencies
+# Development dependencies for nadlan-mcp
+# Install with: pip install -r requirements-dev.txt
 -r requirements.txt
 
 # Testing
-pytest>=7.0.0,<8.0.0
-pytest-cov>=4.0.0,<5.0.0
-pytest-mock>=3.10.0,<4.0.0
-vcrpy>=4.2.0,<5.0.0
+pytest>=7.4.0,<9.0.0
+pytest-cov>=4.1.0,<6.0.0
+pytest-mock>=3.11.1,<4.0.0
+pytest-anyio>=0.0.0,<1.0.0
+vcrpy>=5.1.0,<7.0.0
 
-# Code quality
-black>=23.0.0,<24.0.0
-isort>=5.12.0,<6.0.0
-flake8>=6.0.0,<7.0.0
-mypy>=1.0.0,<2.0.0
-pre-commit>=3.0.0,<4.0.0
+# Code Quality - Using Ruff (replaces black, isort, flake8)
+ruff>=0.6.0,<1.0.0
+mypy>=1.11.0,<2.0.0
+pre-commit>=3.8.0,<4.0.0
+bandit>=1.7.9,<2.0.0
 
 # Type stubs
 types-requests>=2.31.0,<3.0.0
-

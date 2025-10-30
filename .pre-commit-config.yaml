@@ -1,0 +1,68 @@
+# Pre-commit hooks for code quality
+# Install: pre-commit install
+# Run manually: pre-commit run --all-files
+# Update hooks: pre-commit autoupdate
+
+repos:
+  # Ruff - Fast Python linter and formatter (replaces black, isort, flake8)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.0  # Use latest version
+    hooks:
+      # Run the linter
+      - id: ruff
+        args: [--fix]
+        types_or: [python, pyi]
+
+      # Run the formatter
+      - id: ruff-format
+        types_or: [python, pyi]
+
+  # Mypy - Static type checker (disabled for now - needs type annotation fixes)
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.11.0  # Use latest version
+  #   hooks:
+  #     - id: mypy
+  #       additional_dependencies:
+  #         - types-requests
+  #         - pydantic>=2.0.0
+  #       args: [--config-file=pyproject.toml]
+  #       exclude: ^tests/
+
+  # Pre-commit hooks for general file quality
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      # File formatting
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--maxkb=500]
+
+      # Code quality
+      - id: check-ast  # Validate Python syntax
+      - id: check-merge-conflict
+      - id: debug-statements  # Check for debugger imports
+
+      # Security
+      - id: detect-private-key
+
+  # Check for common security issues (disabled for now - needs baseline configuration)
+  # - repo: https://github.com/PyCQA/bandit
+  #   rev: 1.7.9
+  #   hooks:
+  #     - id: bandit
+  #       args: [-c, pyproject.toml]
+  #       exclude: ^tests/
+
+# CI skip: Set to false to run hooks in CI
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+  autofix_prs: true
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false
