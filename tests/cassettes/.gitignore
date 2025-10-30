@@ -1,0 +1,3 @@
+# VCR cassettes (uncomment to ignore)
+# tests/cassettes/*.yaml
+!tests/cassettes/.gitkeep
