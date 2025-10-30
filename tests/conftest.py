@@ -4,6 +4,7 @@ Pytest configuration for nadlan_mcp tests.
 
 import pytest
 from unittest.mock import Mock
+from tests.vcr_config import my_vcr
 
 
 @pytest.fixture
@@ -57,4 +58,22 @@ def sample_deals_response():
                 "neighborhood": "test neighborhood"
             }
         ]
-    } 
+    }
+
+
+@pytest.fixture
+def vcr_cassette(request):
+    """
+    Fixture that provides VCR cassette for recording/replaying HTTP interactions.
+
+    Usage:
+        def test_something(vcr_cassette):
+            with vcr_cassette:
+                # Make HTTP calls here
+                response = requests.get("...")
+    """
+    # Generate cassette name from test name
+    test_name = request.node.name
+    cassette_name = f"{request.module.__name__}.{test_name}"
+
+    return my_vcr.use_cassette(cassette_name)
