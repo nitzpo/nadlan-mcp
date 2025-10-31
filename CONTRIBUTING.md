@@ -138,7 +138,7 @@ git commit -m "fix: resolve issue with..."
 - `style:` - Code style changes
 - `chore:` - Build/tooling changes
 
-### 6. Push and Create PR
+### 5. Push and Create PR
 
 ```bash
 git push origin feature/your-feature-name
