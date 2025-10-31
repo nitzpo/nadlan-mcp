@@ -120,12 +120,13 @@ class TestGovmapClient:
         )
 
         # We'll test the coordinate parsing logic by calling the method that uses it
-        with patch.object(client, "autocomplete_address", return_value=mock_autocomplete_result):
-            with patch.object(client, "get_deals_by_radius", return_value=[]):
-                with patch.object(client, "get_street_deals", return_value=[]):
-                    with patch.object(client, "get_neighborhood_deals", return_value=[]):
-                        result = client.find_recent_deals_for_address("test", years_back=1)
-                        assert result == []
+        with patch.object(
+            client, "autocomplete_address", return_value=mock_autocomplete_result
+        ), patch.object(client, "get_deals_by_radius", return_value=[]), patch.object(
+            client, "get_street_deals", return_value=[]
+        ), patch.object(client, "get_neighborhood_deals", return_value=[]):
+            result = client.find_recent_deals_for_address("test", years_back=1)
+            assert result == []
 
     @patch("requests.Session")
     def test_get_deals_by_radius_success(self, mock_session_class):
@@ -333,9 +334,10 @@ class TestGovmapClient:
             ],
         )
 
-        with patch.object(client, "autocomplete_address", return_value=mock_autocomplete_result):
-            with pytest.raises(ValueError, match="No coordinates found"):
-                client.find_recent_deals_for_address("test", years_back=1)
+        with patch.object(
+            client, "autocomplete_address", return_value=mock_autocomplete_result
+        ), pytest.raises(ValueError, match="No coordinates found"):
+            client.find_recent_deals_for_address("test", years_back=1)
 
 
 class TestMarketAnalysisFunctions:

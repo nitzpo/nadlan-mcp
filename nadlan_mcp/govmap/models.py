@@ -334,34 +334,30 @@ class DealFilters(BaseModel):
     @classmethod
     def validate_max_rooms(cls, v: Optional[float], info) -> Optional[float]:
         """Ensure max_rooms >= min_rooms if both specified."""
-        if v is not None and info.data.get("min_rooms") is not None:
-            if v < info.data["min_rooms"]:
-                raise ValueError("max_rooms must be >= min_rooms")
+        if v is not None and info.data.get("min_rooms") is not None and v < info.data["min_rooms"]:
+            raise ValueError("max_rooms must be >= min_rooms")
         return v
 
     @field_validator("max_price")
     @classmethod
     def validate_max_price(cls, v: Optional[float], info) -> Optional[float]:
         """Ensure max_price >= min_price if both specified."""
-        if v is not None and info.data.get("min_price") is not None:
-            if v < info.data["min_price"]:
-                raise ValueError("max_price must be >= min_price")
+        if v is not None and info.data.get("min_price") is not None and v < info.data["min_price"]:
+            raise ValueError("max_price must be >= min_price")
         return v
 
     @field_validator("max_area")
     @classmethod
     def validate_max_area(cls, v: Optional[float], info) -> Optional[float]:
         """Ensure max_area >= min_area if both specified."""
-        if v is not None and info.data.get("min_area") is not None:
-            if v < info.data["min_area"]:
-                raise ValueError("max_area must be >= min_area")
+        if v is not None and info.data.get("min_area") is not None and v < info.data["min_area"]:
+            raise ValueError("max_area must be >= min_area")
         return v
 
     @field_validator("max_floor")
     @classmethod
     def validate_max_floor(cls, v: Optional[int], info) -> Optional[int]:
         """Ensure max_floor >= min_floor if both specified."""
-        if v is not None and info.data.get("min_floor") is not None:
-            if v < info.data["min_floor"]:
-                raise ValueError("max_floor must be >= min_floor")
+        if v is not None and info.data.get("min_floor") is not None and v < info.data["min_floor"]:
+            raise ValueError("max_floor must be >= min_floor")
         return v

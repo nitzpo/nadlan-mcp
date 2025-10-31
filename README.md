@@ -275,22 +275,39 @@ python -c "import logging; logging.basicConfig(level=logging.DEBUG)" run_mcp_ser
 ### Python Library Usage
 
 ```python
-from nadlan_mcp import GovmapClient
+from nadlan_mcp.govmap import GovmapClient
 
 # Initialize the client
 client = GovmapClient()
 
 # Search for recent deals for a specific address
-address = "סוקולוב 38 חולון"
+address = "רוטשילד 1 תל אביב"
 deals = client.find_recent_deals_for_address(address, years_back=2)
 
 print(f"Found {len(deals)} deals for {address}")
 for deal in deals[:5]:  # Show first 5 deals
-    print(f"Address: {deal.get('address')}")
-    print(f"Date: {deal.get('dealDate')}")
-    print(f"Price: {deal.get('price')}")
+    print(f"Address: {deal.address_description}")
+    print(f"Date: {deal.deal_date}")
+    print(f"Price: ₪{deal.deal_amount:,.0f}")
     print("---")
 ```
+
+## Usage Examples
+
+The `examples/` directory contains practical examples:
+
+- **[basic_search.py](examples/basic_search.py)** - Simple address lookup and recent deals
+- **[market_analysis.py](examples/market_analysis.py)** - Comprehensive market trend analysis
+- **[investment_analysis.py](examples/investment_analysis.py)** - Compare multiple neighborhoods for investment
+- **[valuation.py](examples/valuation.py)** - Property valuation using comparable sales
+
+Run any example:
+```bash
+python examples/basic_search.py
+python examples/market_analysis.py
+```
+
+See [examples/README.md](examples/README.md) for detailed usage instructions.
 
 ### Advanced Usage Examples
 
