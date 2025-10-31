@@ -21,7 +21,7 @@ def main():
     }
 
     print(f"Valuing property at: {address}")
-    print(f"Property details:")
+    print("Property details:")
     print(f"  Rooms: {property_details['rooms']}")
     print(f"  Area: {property_details['area']}m²")
     print(f"  Floor: {property_details['floor']}")
@@ -59,13 +59,13 @@ def main():
 
         print("=== Comparable Properties Analysis ===")
         print(f"Number of Comparables: {len(comparables)}")
-        print(f"\nPrice Statistics:")
+        print("\nPrice Statistics:")
         print(f"  Average Price: ₪{stats.mean_price:,.0f}")
         print(f"  Median Price: ₪{stats.median_price:,.0f}")
         print(f"  Price Range: ₪{stats.min_price:,.0f} - ₪{stats.max_price:,.0f}")
 
         if stats.mean_price_per_sqm:
-            print(f"\nPrice per Square Meter:")
+            print("\nPrice per Square Meter:")
             print(f"  Average: ₪{stats.mean_price_per_sqm:,.0f}/m²")
             print(f"  Median: ₪{stats.median_price_per_sqm:,.0f}/m²")
 
@@ -74,15 +74,15 @@ def main():
             estimated_value_low = stats.percentile_25_price_per_sqm * property_details["area"]
             estimated_value_high = stats.percentile_75_price_per_sqm * property_details["area"]
 
-            print(f"\n=== Estimated Property Value ===")
+            print("\n=== Estimated Property Value ===")
             print(f"Based on {property_details['area']}m² at ₪{stats.mean_price_per_sqm:,.0f}/m²:")
             print(f"  Estimated Value: ₪{estimated_value:,.0f}")
-            print(f"  Range (25th-75th percentile):")
+            print("  Range (25th-75th percentile):")
             print(f"    Low: ₪{estimated_value_low:,.0f}")
             print(f"    High: ₪{estimated_value_high:,.0f}")
 
         # Show sample comparables
-        print(f"\n=== Sample Comparables ===")
+        print("\n=== Sample Comparables ===")
         for i, deal in enumerate(comparables[:5], 1):
             print(f"\n{i}. {deal.address_description or 'N/A'}")
             print(f"   Date: {deal.deal_date}")
