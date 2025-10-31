@@ -170,9 +170,9 @@ class TestAPIDataQuality:
         # Check deal amounts are reasonable (10K to 100M NIS)
         for deal in deals:
             if deal.deal_amount > 0:
-                assert (
-                    10000 <= deal.deal_amount <= 100000000
-                ), f"Deal amount {deal.deal_amount} outside reasonable range"
+                assert 10000 <= deal.deal_amount <= 100000000, (
+                    f"Deal amount {deal.deal_amount} outside reasonable range"
+                )
 
     @pytest.mark.api_health
     def test_dates_are_recent(self, client):

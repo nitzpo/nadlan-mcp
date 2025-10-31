@@ -40,6 +40,33 @@ Nadlan-MCP is a Model Context Protocol (MCP) server that provides Israeli real e
 
 - Don't forget the virtualenv in venv/
 
+### Code Quality Workflow
+
+**IMPORTANT: Before making any commits, ensure code quality:**
+
+```bash
+# Quick check - runs all PR checks locally
+./check-quality.sh
+
+# Or manually:
+ruff format .        # Format code
+ruff check . --fix   # Fix lint issues
+pytest tests/ -m "not api_health" -q  # Run tests
+ruff check .         # Verify no issues remain
+```
+
+**For human developers using VSCode/Cursor:**
+- Install Ruff extension (charliermarsh.ruff)
+- Code is auto-formatted on save
+- Lint errors shown inline
+- `.vscode/settings.json` configures this automatically
+
+**For Claude Code:**
+- Always run `ruff format .` before committing
+- Always run `ruff check . --fix` to auto-fix issues
+- Always run tests to verify no breakage
+- Or use `./check-quality.sh` to run all checks at once
+
 ### Running the Server
 
 ```bash

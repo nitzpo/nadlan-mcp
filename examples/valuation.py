@@ -30,7 +30,9 @@ def main():
     try:
         # Get comparable deals with filters
         deals = client.find_recent_deals_for_address(
-            address, years_back=2, radius=200  # Wider radius for more comparables
+            address,
+            years_back=2,
+            radius=200,  # Wider radius for more comparables
         )
 
         if not deals:

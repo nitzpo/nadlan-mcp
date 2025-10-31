@@ -75,7 +75,7 @@ def main():
         print("-" * 80)
         print(f"  Deal Count: {result['deal_count']}")
         print(f"  Avg Price: ₪{result['avg_price']:,.0f}")
-        if result['avg_price_per_sqm']:
+        if result["avg_price_per_sqm"]:
             print(f"  Avg Price/m²: ₪{result['avg_price_per_sqm']:,.0f}")
         print(f"  Activity: {result['activity_score']:.0f}/100 ({result['activity_level']})")
         print(f"  Liquidity: {result['liquidity_score']:.0f}/100")

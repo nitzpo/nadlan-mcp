@@ -34,7 +34,28 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 ```
 
-### 4. Verify Setup
+### 4. Set Up IDE Integration (Recommended)
+
+**For VSCode/Cursor users:**
+
+The project includes `.vscode/settings.json` which automatically:
+- Formats code on save with Ruff
+- Shows lint errors inline
+- Organizes imports automatically
+- Runs tests with pytest
+
+**Install recommended extensions:**
+1. Open VSCode/Cursor in the project directory
+2. You'll be prompted to install recommended extensions
+3. Install "Ruff" extension by charliermarsh
+
+**Benefits:**
+- ✅ Automatic formatting on save
+- ✅ Real-time lint errors
+- ✅ Auto-fix on save
+- ✅ No manual commands needed
+
+### 5. Verify Setup
 
 ```bash
 # Run tests
@@ -43,6 +64,9 @@ pytest tests/ -m "not api_health" -q
 # Check code quality
 ruff check .
 ruff format --check .
+
+# Or use the quick check script
+./check-quality.sh
 ```
 
 ## Development Workflow
@@ -59,21 +83,29 @@ git checkout -b fix/issue-description
 
 Follow the code style guidelines below.
 
-### 3. Run Tests
+**If using VSCode/Cursor with Ruff extension:**
+- Code is automatically formatted on save
+- Lint errors are shown inline
+- Auto-fixes apply on save
+- No manual commands needed!
 
+**If not using IDE integration:**
+- Run `./check-quality.sh` before committing
+- Or run individual commands below
+
+### 3. Check Before Committing
+
+**Quick check (recommended):**
 ```bash
-# Run fast tests
-pytest tests/ -m "not api_health" -q
-
-# Run with coverage
-pytest tests/ -m "not api_health" --cov=nadlan_mcp
-
-# Run specific test file
-pytest tests/govmap/test_filters.py -v
+./check-quality.sh
 ```
 
-### 4. Code Quality Checks
+This script runs all checks that will run in the PR:
+1. Ruff format check
+2. Ruff linting
+3. All tests
 
+**Manual checks:**
 ```bash
 # Format code
 ruff format .
@@ -81,11 +113,14 @@ ruff format .
 # Lint code
 ruff check . --fix
 
+# Run tests
+pytest tests/ -m "not api_health" -q
+
 # Check remaining issues
 ruff check .
 ```
 
-### 5. Commit Changes
+### 4. Commit Changes
 
 ```bash
 git add .
