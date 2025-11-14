@@ -559,18 +559,53 @@ class GovmapClient:
             if not autocomplete_result.results:
                 raise ValueError(f"No results found for address: {address}")
 
-            # Get the best match (first result)
-            best_match = autocomplete_result.results[0]
-            if not best_match.coordinates:
-                raise ValueError("No coordinates found in autocomplete result")
+            # Try multiple autocomplete results to find one with nearby polygons
+            # (autocomplete can return different coordinates for vague queries)
+            nearby_polygons = []
+            point = None
 
-            # Use coordinates from the model
-            point = (best_match.coordinates.longitude, best_match.coordinates.latitude)
+            for result in autocomplete_result.results[:3]:  # Try top 3 results
+                if not result.coordinates:
+                    continue
+
+                test_point = (result.coordinates.longitude, result.coordinates.latitude)
+                test_polygons = self.get_deals_by_radius(test_point, radius=radius)
+
+                if test_polygons:
+                    point = test_point
+                    nearby_polygons = test_polygons
+                    logger.info(
+                        f"Using autocomplete result: '{result.text}' with {len(test_polygons)} polygons"
+                    )
+                    break
+
+            # Fallback: if no results had polygons at specified radius, try expanding radius
+            if not nearby_polygons and radius < 200:
+                logger.warning(f"No polygons found at {radius}m radius, expanding to 200m")
+                # Use first result with coordinates for expanded search
+                for result in autocomplete_result.results[:3]:
+                    if result.coordinates:
+                        test_point = (result.coordinates.longitude, result.coordinates.latitude)
+                        nearby_polygons = self.get_deals_by_radius(test_point, radius=200)
+                        if nearby_polygons:
+                            point = test_point
+                            logger.info(
+                                f"Found {len(nearby_polygons)} polygons at expanded 200m radius"
+                            )
+                            break
+
+            # Final fallback: use first result even if no polygons (will return empty results)
+            if not point:
+                best_match = autocomplete_result.results[0]
+                if not best_match.coordinates:
+                    raise ValueError("No coordinates found in any autocomplete result")
+                point = (best_match.coordinates.longitude, best_match.coordinates.latitude)
+                logger.warning(
+                    f"No polygons found for '{best_match.text}', will return empty results"
+                )
+
             search_address_normalized = address.lower().strip()
-            logger.info(f"Found coordinates: {point}")
-
-            # Step 2: Get polygon metadata by radius to find polygon IDs
-            nearby_polygons = self.get_deals_by_radius(point, radius=radius)
+            logger.info(f"Using coordinates: {point}")
 
             # Extract unique polygon IDs from metadata dicts
             polygon_ids = set()
@@ -612,7 +647,7 @@ class GovmapClient:
                     # Get street deals first (higher priority)
                     current_street_deals = self.get_street_deals(
                         polygon_id,
-                        limit=max_deals // 2,  # Allocate more to street deals
+                        limit=max(1, max_deals // 2),  # Allocate more to street deals (min 1)
                         start_date=start_date_str,
                         end_date=end_date_str,
                         deal_type=deal_type,
@@ -624,7 +659,9 @@ class GovmapClient:
                     if len(street_deals) < max_deals // 2:
                         current_neighborhood_deals = self.get_neighborhood_deals(
                             polygon_id,
-                            limit=max_deals // 4,  # Allocate less to neighborhood deals
+                            limit=max(
+                                1, max_deals // 4
+                            ),  # Allocate less to neighborhood deals (min 1)
                             start_date=start_date_str,
                             end_date=end_date_str,
                             deal_type=deal_type,
