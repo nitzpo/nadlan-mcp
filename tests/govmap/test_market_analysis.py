@@ -32,31 +32,31 @@ class TestParseDealDates:
             Deal(
                 objectid=1,
                 deal_amount=1000000,
-                deal_date=get_recent_date(months_ago=4, days_ago=15),
+                deal_date=get_recent_date(months_ago=4, days_ago=5),
                 asset_area=80,
             ),
             Deal(
                 objectid=2,
                 deal_amount=1100000,
-                deal_date=get_recent_date(months_ago=4, days_ago=10),
+                deal_date=get_recent_date(months_ago=3, days_ago=5),
                 asset_area=85,
             ),
             Deal(
                 objectid=3,
                 deal_amount=1200000,
-                deal_date=get_recent_date(months_ago=3, days_ago=20),
+                deal_date=get_recent_date(months_ago=2, days_ago=5),
                 asset_area=90,
             ),
             Deal(
                 objectid=4,
                 deal_amount=1300000,
-                deal_date=get_recent_date(months_ago=2, days_ago=25),
+                deal_date=get_recent_date(months_ago=1, days_ago=5),
                 asset_area=95,
             ),
             Deal(
                 objectid=5,
                 deal_amount=1400000,
-                deal_date=get_recent_date(months_ago=1, days_ago=18),
+                deal_date=get_recent_date(months_ago=0, days_ago=5),
                 asset_area=100,
             ),
         ]
