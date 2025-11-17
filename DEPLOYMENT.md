@@ -94,6 +94,155 @@ deals = client.find_recent_deals_for_address("תל אביב רוטשילד 1", y
 print(f"Found {len(deals)} deals")
 ```
 
+### Option 4: Cloud Deployment (HTTP)
+
+Deploy Nadlan-MCP as an HTTP service to cloud platforms like Render, Railway, or using Docker.
+
+#### Prerequisites
+
+- Docker installed (for Docker deployment)
+- Render/Railway account (for cloud deployment)
+- Git repository (for cloud deployment)
+
+#### 4.1: Render Deployment
+
+**Step 1:** Push your code to a Git repository (GitHub, GitLab, etc.)
+
+**Step 2:** Create a new Web Service on Render:
+- Go to https://dashboard.render.com
+- Click "New +" → "Web Service"
+- Connect your Git repository
+- Configure:
+  - **Name:** `nadlan-mcp` (or your preferred name)
+  - **Environment:** `Docker`
+  - **Region:** Choose closest to your users
+  - **Branch:** `main` (or your default branch)
+  - **Build Command:** (leave empty - Docker handles this)
+  - **Start Command:** (leave empty - Docker CMD is used)
+
+**Step 3:** Configure Environment Variables (optional):
+
+In Render dashboard, add environment variables:
+```
+GOVMAP_MAX_RETRIES=3
+GOVMAP_REQUESTS_PER_SECOND=5.0
+GOVMAP_DEFAULT_YEARS_BACK=2
+```
+
+**Step 4:** Deploy
+- Click "Create Web Service"
+- Render will automatically build and deploy your Docker container
+- Wait for deployment to complete (~2-5 minutes)
+
+**Step 5:** Access Your Service
+- Your service will be available at: `https://your-service-name.onrender.com`
+- MCP endpoint: `https://your-service-name.onrender.com/mcp`
+- Health check: `https://your-service-name.onrender.com/health`
+
+**Important Notes:**
+- Render's free tier may have cold starts (delays when service is idle)
+- For production, use a paid plan for better performance
+- The HTTP server runs on the port specified by Render's `PORT` environment variable
+
+#### 4.2: Docker Deployment
+
+**Build the Docker Image:**
+
+```bash
+docker build -t nadlan-mcp .
+```
+
+**Run Locally:**
+
+```bash
+# Run on default port 8000
+docker run -p 8000:8000 nadlan-mcp
+
+# Run on custom port
+docker run -p 8080:8080 -e PORT=8080 nadlan-mcp
+
+# Run with environment variables
+docker run -p 8000:8000 \
+  -e GOVMAP_MAX_RETRIES=5 \
+  -e GOVMAP_REQUESTS_PER_SECOND=3.0 \
+  nadlan-mcp
+```
+
+**Test the Deployment:**
+
+```bash
+# Check health endpoint
+curl http://localhost:8000/health
+
+# Expected response:
+# {"status":"ok","service":"nadlan-mcp"}
+```
+
+**Push to Docker Registry (Optional):**
+
+```bash
+# Tag for Docker Hub
+docker tag nadlan-mcp your-username/nadlan-mcp:latest
+
+# Push to Docker Hub
+docker push your-username/nadlan-mcp:latest
+
+# Or use GitHub Container Registry
+docker tag nadlan-mcp ghcr.io/your-username/nadlan-mcp:latest
+docker push ghcr.io/your-username/nadlan-mcp:latest
+```
+
+#### 4.3: Railway Deployment
+
+**Step 1:** Install Railway CLI (optional) or use web dashboard
+
+```bash
+npm install -g @railway/cli
+railway login
+```
+
+**Step 2:** Deploy from CLI:
+
+```bash
+railway init
+railway up
+```
+
+**Or via Web Dashboard:**
+- Go to https://railway.app
+- Click "New Project" → "Deploy from GitHub repo"
+- Select your repository
+- Railway auto-detects Dockerfile and deploys
+
+**Step 3:** Configure Environment Variables
+
+In Railway dashboard, add variables as needed (see Configuration section below)
+
+**Step 4:** Access Your Service
+- Railway provides a public URL
+- MCP endpoint: `https://your-service.railway.app/mcp`
+- Health check: `https://your-service.railway.app/health`
+
+#### 4.4: Other Cloud Platforms
+
+The HTTP server can be deployed to any platform that supports:
+- Docker containers
+- Python applications
+- Port binding via `PORT` environment variable
+
+**Supported Platforms:**
+- **Google Cloud Run** - Serverless container deployment
+- **AWS ECS/Fargate** - Container orchestration
+- **Azure Container Instances** - Container deployment
+- **DigitalOcean App Platform** - PaaS deployment
+- **Heroku** - Dyno-based deployment
+
+**Deployment Pattern:**
+1. Use the provided `Dockerfile`
+2. Set `PORT` environment variable (if not auto-set by platform)
+3. Configure health check to `GET /health`
+4. Deploy and access at `https://your-domain.com/mcp`
+
 ## Configuration
 
 ### Environment Variables

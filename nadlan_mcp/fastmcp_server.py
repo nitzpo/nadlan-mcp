@@ -11,6 +11,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from mcp.server.fastmcp import FastMCP
+from starlette.responses import JSONResponse
 
 from nadlan_mcp.govmap import GovmapClient
 from nadlan_mcp.govmap.models import Deal
@@ -964,6 +965,18 @@ def get_market_activity_metrics(address: str, years_back: int = 2, radius_meters
     except Exception as e:
         logger.error(f"Error in get_market_activity_metrics: {e}")
         return f"Error analyzing market activity: {str(e)}"
+
+
+# Health check endpoint for HTTP deployments
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(request):
+    """
+    Health check endpoint for container orchestration platforms (Render, Railway, etc.).
+
+    Returns a simple OK status to indicate the server is running.
+    This endpoint is accessible at GET /health when using HTTP transport.
+    """
+    return JSONResponse({"status": "ok", "service": "nadlan-mcp"})
 
 
 # Run the server

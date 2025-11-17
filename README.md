@@ -104,6 +104,46 @@ You can also run the server directly:
 python -m nadlan_mcp.simple_fastmcp_server
 ```
 
+#### 5. HTTP Server (For Cloud Deployment)
+
+**NEW: HTTP transport for deploying to Render, Railway, Docker, and other cloud platforms**
+
+For production deployment to cloud platforms, use the HTTP server:
+
+```bash
+python run_http_server.py
+```
+
+This starts the FastMCP server with HTTP transport, listening on port 8000 by default (configurable via PORT environment variable).
+
+**Using Docker:**
+
+Build and run the container:
+
+```bash
+# Build the Docker image
+docker build -t nadlan-mcp .
+
+# Run the container
+docker run -p 8000:8000 nadlan-mcp
+
+# Or with custom port
+docker run -p 8080:8080 -e PORT=8080 nadlan-mcp
+```
+
+**Environment Variables:**
+
+- `PORT` - HTTP server port (default: 8000)
+- `HOST` - Bind address (default: 0.0.0.0)
+- See DEPLOYMENT.md for all Govmap API configuration options
+
+**Endpoints:**
+
+- `http://localhost:8000/mcp` - MCP protocol endpoint
+- `http://localhost:8000/health` - Health check endpoint
+
+For detailed deployment instructions to Render, Railway, or other platforms, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
 #### MCP Client Configuration
 
 To connect to the server from MCP clients, use the following configuration:

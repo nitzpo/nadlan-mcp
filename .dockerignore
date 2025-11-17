@@ -1,0 +1,90 @@
+# Git files
+.git/
+.gitignore
+.github/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDEs and editors
+.vscode/
+.cursor/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Documentation (not needed in container)
+*.md
+!README.md
+docs/
+
+# Environment files
+.env
+.env.*
+*.env
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Test files (not needed in production)
+tests/
+test_*.py
+*_test.py
+
+# Development files
+requirements-dev.txt
+pyproject.toml
+setup.py
+setup.cfg
+
+# Logs and temp files
+*.log
+*.tmp
+tmp/
+temp/
+
+# Docker files (avoid recursive copies)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
