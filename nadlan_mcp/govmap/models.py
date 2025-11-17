@@ -132,7 +132,7 @@ class Deal(BaseModel):
     )
 
     # Additional details
-    rooms: Optional[float] = Field(None, description="Number of rooms")
+    rooms: Optional[float] = Field(None, alias="assetRoomNum", description="Number of rooms")
 
     # Priority and metadata (added by our system, not from API)
     priority: Optional[int] = Field(
