@@ -55,9 +55,14 @@ This project provides a comprehensive Python interface to the Israeli government
      source venv/bin/activate
      ```
 
-4. **Install required packages:**
+4. **Install the package:**
    ```bash
-   pip install -r requirements.txt
+   pip install -e .
+   ```
+
+   Or for development with all dev dependencies:
+   ```bash
+   pip install -e .[dev]
    ```
 
 ## Usage
@@ -298,7 +303,7 @@ python -c "import logging; logging.basicConfig(level=logging.DEBUG)" run_mcp_ser
 #### Troubleshooting
 
 **Connection Issues:**
-- Ensure all dependencies are installed: `pip install -r requirements.txt`
+- Ensure all dependencies are installed: `pip install -e .`
 - Check that Python path is correct in client configuration
 - Verify the server starts without errors
 

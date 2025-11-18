@@ -8,16 +8,17 @@ enabling deployment to cloud platforms like Render, Railway, or Docker container
 For local Claude Desktop integration, use run_fastmcp_server.py (stdio transport) instead.
 """
 
+import logging
 import os
 import sys
-import logging
+
 import uvicorn
+
 from nadlan_mcp.fastmcp_server import mcp
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ def main():
     logger.info("=" * 60)
     logger.info("Starting Nadlan-MCP HTTP Server")
     logger.info("=" * 60)
-    logger.info(f"Transport: HTTP (via uvicorn)")
+    logger.info("Transport: HTTP (via uvicorn)")
     logger.info(f"Host: {host}")
     logger.info(f"Port: {port}")
     logger.info(f"MCP Endpoint: http://{host}:{port}/mcp")
@@ -41,15 +42,15 @@ def main():
     try:
         # Get the HTTP ASGI app from FastMCP
         # Try different possible method names based on FastMCP version
-        if hasattr(mcp, 'streamable_http_app'):
+        if hasattr(mcp, "streamable_http_app"):
             app = mcp.streamable_http_app()
-        elif hasattr(mcp, 'http_app'):
+        elif hasattr(mcp, "http_app"):
             app = mcp.http_app()
-        elif hasattr(mcp, 'get_app'):
+        elif hasattr(mcp, "get_app"):
             app = mcp.get_app()
         else:
             # Fallback: try to access the app directly
-            app = getattr(mcp, 'app', None)
+            app = getattr(mcp, "app", None)
             if app is None:
                 raise AttributeError(
                     "FastMCP instance has no HTTP app method. "
@@ -59,12 +60,7 @@ def main():
         logger.info(f"Using app: {type(app).__name__}")
 
         # Run with uvicorn
-        uvicorn.run(
-            app,
-            host=host,
-            port=port,
-            log_level="info"
-        )
+        uvicorn.run(app, host=host, port=port, log_level="info")
     except Exception as e:
         logger.error(f"Failed to start HTTP server: {e}", exc_info=True)
         sys.exit(1)

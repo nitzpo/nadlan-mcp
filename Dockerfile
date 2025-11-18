@@ -18,16 +18,16 @@ RUN apt-get update && \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better layer caching
-COPY requirements.txt .
+# Copy package files for better layer caching
+COPY pyproject.toml .
+COPY README.md .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir .
 
 # Copy application code
 COPY nadlan_mcp/ ./nadlan_mcp/
 COPY run_http_server.py .
-COPY README.md .
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && \
