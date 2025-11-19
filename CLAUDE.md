@@ -159,18 +159,20 @@ The codebase follows a four-layer architecture:
 ## Key Files
 
 - `nadlan_mcp/govmap/` - **✅ Refactored modular package** (Phase 3 & 4 complete)
-  - `models.py` - **✨ Pydantic v2 data models** (~338 lines, 9 models) **NEW in v2.0**
+  - `models.py` - **✨ Pydantic v2 data models** (~400 lines, 10 models) **UPDATED** (added OutlierReport)
   - `client.py` - Core API client (~30KB, returns Pydantic models)
   - `validators.py` - Input validation (~3KB)
   - `filters.py` - Deal filtering (~5KB, accepts/returns models)
-  - `statistics.py` - Statistical calculations (~4KB, returns models)
-  - `market_analysis.py` - Market analysis (~17KB, returns models)
+  - `statistics.py` - Statistical calculations with outlier filtering (~8KB, returns models) **UPDATED**
+  - `market_analysis.py` - Market analysis with robust volatility (~18KB, returns models) **UPDATED**
+  - `outlier_detection.py` - **✨ Outlier detection & filtering** (~10KB) **NEW**
   - `utils.py` - Helper utilities (~4KB)
   - `__init__.py` - Package exports for backward compatibility
 - `nadlan_mcp/fastmcp_server.py` - MCP tool definitions (10 implemented tools)
 - `nadlan_mcp/config.py` - Configuration management
 - `run_fastmcp_server.py` - Server entry point
 - `tests/govmap/test_models.py` - **✨ Model tests** (50+ tests) **NEW**
+- `tests/govmap/test_outlier_detection.py` - **✨ Outlier detection tests** (24 tests) **NEW**
 - `tests/test_govmap_client.py` - Main test suite (34 tests, partially updated for v2.0)
 - `MIGRATION.md` - **✨ v1.x → v2.0 migration guide** **NEW**
 - `USECASES.md` - **Product roadmap and feature status** (essential reading)
@@ -232,6 +234,69 @@ deal_json = deal.model_dump_json()  # Convert to JSON string
 - Computed fields like `price_per_sqm` are automatically calculated
 - Use `.model_dump()` to serialize models to dicts for JSON/MCP responses
 - See `MIGRATION.md` for complete migration guide
+
+### Outlier Detection & Statistical Refinement **✨ NEW**
+
+The MCP now includes configurable outlier detection and robust statistical measures to improve analysis accuracy. This is especially important for handling:
+- **Data entry errors**: Wrong area values (1 sqm instead of 100) → extreme price_per_sqm
+- **Partial deals**: Family sales or partial ownership (400K apartment when typical is 1.6M)
+- **Special circumstances**: Distressed sales, data anomalies
+
+**Key Features:**
+- **IQR-based outlier detection**: Uses Interquartile Range (robust to skewed data)
+- **Hard bounds filtering**: Removes obvious errors (price_per_sqm < 1K or > 100K NIS/sqm, deals < 100K NIS)
+- **Robust volatility**: Investment analysis uses IQR instead of std_dev for stability ratings
+- **Transparent reporting**: Returns both filtered and unfiltered statistics with outlier reports
+
+**Configuration (environment variables):**
+```bash
+# Outlier Detection Strategy
+ANALYSIS_OUTLIER_METHOD=iqr          # Options: iqr, percent, none (default: iqr)
+ANALYSIS_IQR_MULTIPLIER=1.5          # 1.5=moderate, 3.0=conservative (default: 1.5)
+ANALYSIS_MIN_DEALS_FOR_OUTLIER_DETECTION=10  # Minimum deals needed (default: 10)
+
+# Hard Bounds (catches obvious data errors)
+ANALYSIS_PRICE_PER_SQM_MIN=1000      # 1K NIS/sqm minimum (default: 1000)
+ANALYSIS_PRICE_PER_SQM_MAX=100000    # 100K NIS/sqm maximum (default: 100000)
+ANALYSIS_MIN_DEAL_AMOUNT=100000      # 100K NIS minimum (catches partial deals, default: 100000)
+
+# Statistical Robustness (for investment analysis)
+ANALYSIS_USE_ROBUST_VOLATILITY=true  # Use IQR for volatility (default: true)
+ANALYSIS_USE_ROBUST_TRENDS=true      # Filter outliers before trend analysis (default: true)
+
+# Reporting
+ANALYSIS_INCLUDE_UNFILTERED_STATS=true  # Report both filtered/unfiltered (default: true)
+```
+
+**Usage Example:**
+```python
+from nadlan_mcp.govmap.statistics import calculate_deal_statistics
+from nadlan_mcp.config import GovmapConfig
+
+# With outlier filtering (default behavior)
+config = GovmapConfig()  # Uses env vars or defaults
+stats = calculate_deal_statistics(deals, config)
+
+# Access filtered statistics (main results after outlier removal)
+filtered_mean = stats.filtered_price_per_sqm_statistics["mean"]
+filtered_median = stats.filtered_price_per_sqm_statistics["median"]
+
+# Access outlier report
+if stats.outlier_report:
+    print(f"Removed {stats.outlier_report.outliers_removed} outliers")
+    print(f"Method: {stats.outlier_report.method_used}")
+    print(f"Filtered indices: {stats.outlier_report.outlier_indices}")
+
+# Original (unfiltered) statistics still available
+original_mean = stats.price_per_sqm_statistics["mean"]
+```
+
+**Design Principles:**
+- **Enabled by default**: Moderate filtering (k=1.5) to catch common errors
+- **Transparent**: Both filtered and unfiltered statistics returned
+- **Conservative with real data**: Hard bounds + IQR preserve legitimate high-end properties
+- **Configurable**: Adjust sensitivity via environment variables
+- **MCP provides data, LLM provides intelligence**: Outlier detection improves data quality; LLM interprets results
 
 ### Retry Logic
 All API calls use automatic retry with exponential backoff (configurable via `GOVMAP_MAX_RETRIES`). The pattern is implemented in `GovmapClient._make_request()`.

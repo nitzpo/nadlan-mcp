@@ -6,39 +6,27 @@ This module provides pure mathematical functions for analyzing real estate deal 
 
 from collections import Counter
 import logging
-from typing import List
+from typing import Dict, List, Optional
 
-from .models import Deal, DealStatistics
+from nadlan_mcp.config import GovmapConfig, get_config
+
+from .models import Deal, DealStatistics, OutlierReport
+from .outlier_detection import filter_deals_for_analysis
 
 logger = logging.getLogger(__name__)
 
 
-def calculate_deal_statistics(deals: List[Deal]) -> DealStatistics:
+def _calculate_basic_stats(deals: List[Deal]) -> Dict:
     """
-    Calculate statistical aggregations on deal data.
+    Internal helper to calculate basic statistics from a deal list.
 
     Args:
         deals: List of Deal model instances
 
     Returns:
-        DealStatistics model with comprehensive metrics
-
-    Raises:
-        ValueError: If deals is not a valid list
+        Dictionary with price_stats, area_stats, price_per_sqm_stats,
+        property_type_dist, and date_range
     """
-    if not isinstance(deals, list):
-        raise ValueError("deals must be a list")
-
-    if not deals:
-        return DealStatistics(
-            total_deals=0,
-            price_statistics={},
-            area_statistics={},
-            price_per_sqm_statistics={},
-            property_type_distribution={},
-            date_range=None,
-        )
-
     # Extract numeric values
     prices = []
     areas = []
@@ -154,13 +142,91 @@ def calculate_deal_statistics(deals: List[Deal]) -> DealStatistics:
             logger.warning("Invalid date format in date range calculation")
             pass
 
+    return {
+        "price_statistics": price_stats,
+        "area_statistics": area_stats,
+        "price_per_sqm_statistics": price_per_sqm_stats,
+        "property_type_distribution": property_type_dist,
+        "date_range": date_range_dict,
+    }
+
+
+def calculate_deal_statistics(
+    deals: List[Deal], config: Optional[GovmapConfig] = None
+) -> DealStatistics:
+    """
+    Calculate statistical aggregations on deal data with optional outlier filtering.
+
+    This function calculates comprehensive statistics on real estate deals, optionally
+    filtering outliers based on configuration. When outlier filtering is enabled, it
+    returns both original (unfiltered) and filtered statistics for transparency.
+
+    Args:
+        deals: List of Deal model instances
+        config: Configuration object (optional, uses global config if not provided)
+
+    Returns:
+        DealStatistics model with comprehensive metrics, including:
+        - Original statistics (calculated on all deals)
+        - Filtered statistics (calculated after outlier removal, if enabled)
+        - Outlier report (details on what was filtered, if enabled)
+
+    Raises:
+        ValueError: If deals is not a valid list
+    """
+    if not isinstance(deals, list):
+        raise ValueError("deals must be a list")
+
+    if config is None:
+        config = get_config()
+
+    if not deals:
+        return DealStatistics(
+            total_deals=0,
+            price_statistics={},
+            area_statistics={},
+            price_per_sqm_statistics={},
+            property_type_distribution={},
+            date_range=None,
+        )
+
+    # Step 1: Calculate statistics on original data
+    original_stats = _calculate_basic_stats(deals)
+
+    # Step 2: Apply outlier filtering if enabled
+    outlier_report_data = None
+    filtered_stats = None
+
+    if (
+        config.analysis_outlier_method != "none"
+        and len(deals) >= config.analysis_min_deals_for_outlier_detection
+    ):
+        # Filter deals for analysis (primarily targeting price_per_sqm outliers)
+        filtered_deals, report_dict = filter_deals_for_analysis(
+            deals, config, metric="price_per_sqm"
+        )
+
+        # Create OutlierReport model
+        outlier_report_data = OutlierReport(**report_dict)
+
+        # Calculate statistics on filtered data
+        if filtered_deals and len(filtered_deals) > 0:
+            filtered_basic_stats = _calculate_basic_stats(filtered_deals)
+            filtered_stats = {
+                "filtered_deal_count": len(filtered_deals),
+                "filtered_price_statistics": filtered_basic_stats["price_statistics"],
+                "filtered_area_statistics": filtered_basic_stats["area_statistics"],
+                "filtered_price_per_sqm_statistics": filtered_basic_stats[
+                    "price_per_sqm_statistics"
+                ],
+            }
+
+    # Step 3: Return comprehensive DealStatistics with both original and filtered data
     return DealStatistics(
         total_deals=len(deals),
-        price_statistics=price_stats,
-        area_statistics=area_stats,
-        price_per_sqm_statistics=price_per_sqm_stats,
-        property_type_distribution=property_type_dist,
-        date_range=date_range_dict,
+        **original_stats,
+        outlier_report=outlier_report_data,
+        **(filtered_stats if filtered_stats else {}),
     )
 
 

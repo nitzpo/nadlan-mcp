@@ -10,7 +10,10 @@ from datetime import date, datetime, timedelta
 import logging
 from typing import Dict, List, Optional, Tuple
 
+from nadlan_mcp.config import GovmapConfig, get_config
+
 from .models import Deal, InvestmentAnalysis, LiquidityMetrics, MarketActivityScore
+from .outlier_detection import calculate_iqr, filter_deals_for_analysis
 from .statistics import calculate_std_dev
 
 logger = logging.getLogger(__name__)
@@ -201,7 +204,9 @@ def calculate_market_activity_score(
     )
 
 
-def analyze_investment_potential(deals: List[Deal]) -> InvestmentAnalysis:
+def analyze_investment_potential(
+    deals: List[Deal], config: Optional[GovmapConfig] = None
+) -> InvestmentAnalysis:
     """
     Analyze investment potential based on price trends and market stability.
 
@@ -209,8 +214,12 @@ def analyze_investment_potential(deals: List[Deal]) -> InvestmentAnalysis:
     and provides investment metrics for decision-making. The MCP provides
     data metrics; the LLM interprets them for investment advice.
 
+    With outlier filtering enabled, this function removes statistical outliers
+    before calculating volatility and trends, resulting in more accurate assessments.
+
     Args:
         deals: List of Deal model instances with price and date information
+        config: Configuration object (optional, uses global config if not provided)
 
     Returns:
         InvestmentAnalysis model containing:
@@ -229,9 +238,27 @@ def analyze_investment_potential(deals: List[Deal]) -> InvestmentAnalysis:
     if not deals:
         raise ValueError("Cannot analyze investment potential from empty deals list")
 
-    # Extract price per sqm and dates
+    if config is None:
+        config = get_config()
+
+    # Step 1: Apply outlier filtering if configured
+    deals_for_analysis = deals
+    if (
+        config.analysis_use_robust_trends
+        and config.analysis_outlier_method != "none"
+        and len(deals) >= config.analysis_min_deals_for_outlier_detection
+    ):
+        filtered_deals, _ = filter_deals_for_analysis(deals, config, metric="price_per_sqm")
+        if filtered_deals and len(filtered_deals) >= 3:  # Need at least 3 deals for analysis
+            deals_for_analysis = filtered_deals
+            logger.info(
+                f"Filtered {len(deals) - len(filtered_deals)} outliers "
+                f"from investment analysis ({len(deals)} → {len(filtered_deals)} deals)"
+            )
+
+    # Step 2: Extract price per sqm and dates from deals_for_analysis
     price_data = []
-    for deal in deals:
+    for deal in deals_for_analysis:
         price_per_sqm = deal.price_per_sqm  # Use computed field from Deal model
 
         if price_per_sqm and price_per_sqm > 0 and deal.deal_date:
@@ -292,12 +319,26 @@ def analyze_investment_potential(deals: List[Deal]) -> InvestmentAnalysis:
     else:
         price_trend = "stable"
 
-    # Calculate price volatility (coefficient of variation)
-    std_dev = calculate_std_dev(prices)
-    if avg_price_per_sqm > 0:
-        coefficient_of_variation = (std_dev / avg_price_per_sqm) * 100
+    # Step 3: Calculate price volatility
+    # Use robust volatility (IQR-based) if configured, otherwise use traditional CV
+    if config.analysis_use_robust_volatility:
+        # Robust volatility using IQR (less sensitive to outliers)
+        iqr = calculate_iqr(prices)
+        # Calculate median for robust CV
+        sorted_prices = sorted(prices)
+        median_price = sorted_prices[len(sorted_prices) // 2]
+        if median_price > 0:
+            # Robust coefficient of variation: IQR / median × 100
+            coefficient_of_variation = (iqr / median_price) * 100
+        else:
+            coefficient_of_variation = 0
     else:
-        coefficient_of_variation = 0
+        # Traditional volatility (coefficient of variation using std_dev)
+        std_dev = calculate_std_dev(prices)
+        if avg_price_per_sqm > 0:
+            coefficient_of_variation = (std_dev / avg_price_per_sqm) * 100
+        else:
+            coefficient_of_variation = 0
 
     # Convert CV to volatility score (0-100, lower is better)
     # Using defined volatility thresholds

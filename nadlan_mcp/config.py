@@ -56,6 +56,45 @@ class GovmapConfig:
         default_factory=lambda: int(os.getenv("GOVMAP_MAX_POLYGONS", "10"))
     )
 
+    # Outlier Detection & Statistical Refinement
+    analysis_outlier_method: str = field(
+        default_factory=lambda: os.getenv("ANALYSIS_OUTLIER_METHOD", "iqr")
+    )
+    analysis_iqr_multiplier: float = field(
+        default_factory=lambda: float(os.getenv("ANALYSIS_IQR_MULTIPLIER", "1.5"))
+    )
+    analysis_min_deals_for_outlier_detection: int = field(
+        default_factory=lambda: int(os.getenv("ANALYSIS_MIN_DEALS_FOR_OUTLIER_DETECTION", "10"))
+    )
+
+    # Hard Bounds for Price per Sqm (catches obvious data errors)
+    analysis_price_per_sqm_min: float = field(
+        default_factory=lambda: float(os.getenv("ANALYSIS_PRICE_PER_SQM_MIN", "1000"))
+    )
+    analysis_price_per_sqm_max: float = field(
+        default_factory=lambda: float(os.getenv("ANALYSIS_PRICE_PER_SQM_MAX", "100000"))
+    )
+
+    # Hard Bounds for Deal Amount (catches partial deals)
+    analysis_min_deal_amount: float = field(
+        default_factory=lambda: float(os.getenv("ANALYSIS_MIN_DEAL_AMOUNT", "100000"))
+    )
+
+    # Statistical Robustness (for investment analysis)
+    analysis_use_robust_volatility: bool = field(
+        default_factory=lambda: os.getenv("ANALYSIS_USE_ROBUST_VOLATILITY", "true").lower()
+        == "true"
+    )
+    analysis_use_robust_trends: bool = field(
+        default_factory=lambda: os.getenv("ANALYSIS_USE_ROBUST_TRENDS", "true").lower() == "true"
+    )
+
+    # Reporting
+    analysis_include_unfiltered_stats: bool = field(
+        default_factory=lambda: os.getenv("ANALYSIS_INCLUDE_UNFILTERED_STATS", "true").lower()
+        == "true"
+    )
+
     # User agent
     user_agent: str = field(
         default_factory=lambda: os.getenv("GOVMAP_USER_AGENT", "NadlanMCP/1.0.0")
@@ -91,6 +130,20 @@ class GovmapConfig:
             raise ValueError("base_url cannot be empty")
         if not self.user_agent:
             raise ValueError("user_agent cannot be empty")
+
+        # Validate outlier detection settings
+        if self.analysis_outlier_method not in ["iqr", "percent", "none"]:
+            raise ValueError("analysis_outlier_method must be one of: iqr, percent, none")
+        if self.analysis_iqr_multiplier <= 0:
+            raise ValueError("analysis_iqr_multiplier must be positive")
+        if self.analysis_min_deals_for_outlier_detection < 0:
+            raise ValueError("analysis_min_deals_for_outlier_detection must be non-negative")
+        if self.analysis_price_per_sqm_min <= 0:
+            raise ValueError("analysis_price_per_sqm_min must be positive")
+        if self.analysis_price_per_sqm_max <= self.analysis_price_per_sqm_min:
+            raise ValueError("analysis_price_per_sqm_max must be > analysis_price_per_sqm_min")
+        if self.analysis_min_deal_amount <= 0:
+            raise ValueError("analysis_min_deal_amount must be positive")
 
 
 # Global configuration instance

@@ -183,6 +183,30 @@ class Deal(BaseModel):
         raise TypeError(f"Unsupported type for date parsing: {type(v)}")
 
 
+class OutlierReport(BaseModel):
+    """
+    Report on outliers detected and removed from analysis.
+
+    Provides transparency about what data was filtered and why,
+    allowing LLMs to understand data quality issues.
+
+    Attributes:
+        total_deals: Total number of deals before filtering
+        outliers_removed: Number of outliers removed
+        outlier_indices: Indices of removed deals in original list
+        method_used: Outlier detection method ("iqr", "percent", "none")
+        parameters: Configuration parameters used for detection
+    """
+
+    total_deals: int = Field(..., description="Total deals before filtering")
+    outliers_removed: int = Field(..., description="Number of outliers removed")
+    outlier_indices: List[int] = Field(default_factory=list, description="Indices of removed deals")
+    method_used: str = Field(..., description="Detection method (iqr, percent, none)")
+    parameters: Dict[str, Any] = Field(
+        default_factory=dict, description="Detection parameters used"
+    )
+
+
 class DealStatistics(BaseModel):
     """
     Statistical analysis of real estate deals.
@@ -221,6 +245,25 @@ class DealStatistics(BaseModel):
 
     # Date range
     date_range: Optional[Dict[str, str]] = Field(None, description="Earliest and latest deal dates")
+
+    # Outlier detection and filtered statistics
+    outlier_report: Optional[OutlierReport] = Field(
+        None, description="Outlier detection report (if filtering was applied)"
+    )
+
+    # Filtered statistics (after outlier removal)
+    filtered_deal_count: Optional[int] = Field(
+        None, description="Number of deals after outlier removal"
+    )
+    filtered_price_statistics: Optional[Dict[str, float]] = Field(
+        None, description="Price statistics after outlier filtering"
+    )
+    filtered_area_statistics: Optional[Dict[str, float]] = Field(
+        None, description="Area statistics after outlier filtering"
+    )
+    filtered_price_per_sqm_statistics: Optional[Dict[str, float]] = Field(
+        None, description="Price/sqm statistics after outlier filtering"
+    )
 
 
 class MarketActivityScore(BaseModel):
