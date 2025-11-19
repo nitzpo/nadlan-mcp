@@ -74,9 +74,9 @@ test_*.py
 
 # Development files
 requirements-dev.txt
-pyproject.toml
-setup.py
-setup.cfg
+# pyproject.toml  # NEEDED for pip install - do not exclude!
+# setup.py        # NEEDED for pip install - do not exclude!
+# setup.cfg       # NEEDED for pip install - do not exclude!
 
 # Logs and temp files
 *.log
