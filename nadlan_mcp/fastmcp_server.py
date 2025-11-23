@@ -258,33 +258,30 @@ def find_recent_deals_for_address(
             }
         }
 
+        # Standardize field names to match other tools
         if prices:
-            stats["price_stats"] = {
-                "average_price": round(sum(prices) / len(prices), 0),
-                "min_price": min(prices),
-                "max_price": max(prices),
-                "median_price": sorted(prices)[len(prices) // 2] if prices else 0,
-                "total_volume": sum(prices),
+            stats["price_statistics"] = {
+                "mean": round(sum(prices) / len(prices), 0),
+                "min": min(prices),
+                "max": max(prices),
+                "median": sorted(prices)[len(prices) // 2] if prices else 0,
+                "total": sum(prices),
             }
 
         if areas:
-            stats["area_stats"] = {
-                "average_area": round(sum(areas) / len(areas), 1),
-                "min_area": min(areas),
-                "max_area": max(areas),
-                "median_area": sorted(areas)[len(areas) // 2] if areas else 0,
+            stats["area_statistics"] = {
+                "mean": round(sum(areas) / len(areas), 1),
+                "min": min(areas),
+                "max": max(areas),
+                "median": sorted(areas)[len(areas) // 2] if areas else 0,
             }
 
         if price_per_sqm_values:
-            stats["price_per_sqm_stats"] = {
-                "average_price_per_sqm": round(
-                    sum(price_per_sqm_values) / len(price_per_sqm_values), 0
-                ),
-                "min_price_per_sqm": round(min(price_per_sqm_values), 0),
-                "max_price_per_sqm": round(max(price_per_sqm_values), 0),
-                "median_price_per_sqm": round(
-                    sorted(price_per_sqm_values)[len(price_per_sqm_values) // 2], 0
-                )
+            stats["price_per_sqm_statistics"] = {
+                "mean": round(sum(price_per_sqm_values) / len(price_per_sqm_values), 0),
+                "min": round(min(price_per_sqm_values), 0),
+                "max": round(max(price_per_sqm_values), 0),
+                "median": round(sorted(price_per_sqm_values)[len(price_per_sqm_values) // 2], 0)
                 if price_per_sqm_values
                 else 0,
             }
@@ -531,6 +528,7 @@ def analyze_market_trends(
         deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
 
         # Return summarized analysis (NO raw deals to save tokens)
+        # Normalize structure with standard market_statistics while keeping tool-specific analysis
         return json.dumps(
             {
                 "analysis_parameters": {
@@ -541,8 +539,12 @@ def analyze_market_trends(
                     "deal_type": deal_type,
                     "deal_type_description": deal_type_desc,
                 },
+                "market_statistics": {
+                    "deal_breakdown": {
+                        "total_deals": len(deals),
+                    },
+                },
                 "market_summary": {
-                    "total_deals": len(deals),
                     "years_with_data": len(yearly_trends),
                     "unique_property_types": len(property_type_analysis),
                     "unique_neighborhoods": len(neighborhood_analysis),
@@ -564,6 +566,7 @@ def analyze_market_trends(
                     else None,
                     "deal_source_summary": f"Building: {len([d for d in deals if getattr(d, 'deal_source', None) == 'same_building'])}, Street: {len([d for d in deals if getattr(d, 'deal_source', None) == 'street'])}, Neighborhood: {len([d for d in deals if getattr(d, 'deal_source', None) == 'neighborhood'])}",
                 },
+                "deals": [],  # Trend analysis doesn't return raw deals to save tokens
             },
             ensure_ascii=False,
             indent=2,
@@ -756,9 +759,18 @@ def get_valuation_comparables(
         if not deals:
             return json.dumps(
                 {
-                    "address": address,
-                    "years_back": years_back,
-                    "comparables": [],
+                    "search_parameters": {
+                        "address": address,
+                        "years_back": years_back,
+                        "radius_meters": radius_meters,
+                        "max_comparables": max_comparables,
+                    },
+                    "market_statistics": {
+                        "deal_breakdown": {
+                            "total_deals": 0,
+                        },
+                    },
+                    "deals": [],
                     "message": "No deals found for this address",
                 },
                 ensure_ascii=False,
@@ -782,20 +794,33 @@ def get_valuation_comparables(
         # Calculate statistics on filtered comparables
         stats = client.calculate_deal_statistics(filtered_deals)
 
+        # Normalize response structure to match other tools
         return json.dumps(
             {
-                "address": address,
-                "years_back": years_back,
-                "filters_applied": {
-                    "property_type": property_type,
-                    "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
-                    "price": f"{min_price}-{max_price}" if min_price or max_price else None,
-                    "area": f"{min_area}-{max_area}" if min_area or max_area else None,
-                    "floor": f"{min_floor}-{max_floor}" if min_floor or max_floor else None,
+                "search_parameters": {
+                    "address": address,
+                    "years_back": years_back,
+                    "radius_meters": radius_meters,
+                    "max_comparables": max_comparables,
+                    "filters_applied": {
+                        "property_type": property_type,
+                        "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
+                        "price": f"{min_price}-{max_price}" if min_price or max_price else None,
+                        "area": f"{min_area}-{max_area}" if min_area or max_area else None,
+                        "floor": f"{min_floor}-{max_floor}" if min_floor or max_floor else None,
+                    },
                 },
-                "total_comparables": len(filtered_deals),
-                "statistics": stats.model_dump(exclude_none=True),  # Serialize DealStatistics model
-                "comparables": strip_bloat_fields(filtered_deals),
+                "market_statistics": {
+                    "deal_breakdown": {
+                        "total_deals": len(filtered_deals),
+                    },
+                    "price_statistics": stats.price_statistics,
+                    "area_statistics": stats.area_statistics,
+                    "price_per_sqm_statistics": stats.price_per_sqm_statistics,
+                    "property_type_distribution": stats.property_type_distribution,
+                    "date_range": stats.date_range,
+                },
+                "deals": strip_bloat_fields(filtered_deals),
             },
             ensure_ascii=False,
             indent=2,
@@ -836,9 +861,15 @@ def get_deal_statistics(
         if not deals:
             return json.dumps(
                 {
-                    "address": address,
-                    "years_back": years_back,
-                    "statistics": {"count": 0, "message": "No deals found for this address"},
+                    "search_parameters": {
+                        "address": address,
+                        "years_back": years_back,
+                    },
+                    "market_statistics": {
+                        "deal_breakdown": {"total_deals": 0},
+                        "message": "No deals found for this address",
+                    },
+                    "deals": [],
                 },
                 ensure_ascii=False,
                 indent=2,
@@ -853,15 +884,28 @@ def get_deal_statistics(
         # Calculate statistics
         stats = client.calculate_deal_statistics(deals)
 
+        # Normalize response structure to match other tools
         return json.dumps(
             {
-                "address": address,
-                "years_back": years_back,
-                "filters_applied": {
-                    "property_type": property_type,
-                    "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
+                "search_parameters": {
+                    "address": address,
+                    "years_back": years_back,
+                    "filters_applied": {
+                        "property_type": property_type,
+                        "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
+                    },
                 },
-                "statistics": stats.model_dump(exclude_none=True),  # Serialize DealStatistics model
+                "market_statistics": {
+                    "deal_breakdown": {
+                        "total_deals": stats.total_deals,
+                    },
+                    "price_statistics": stats.price_statistics,
+                    "area_statistics": stats.area_statistics,
+                    "price_per_sqm_statistics": stats.price_per_sqm_statistics,
+                    "property_type_distribution": stats.property_type_distribution,
+                    "date_range": stats.date_range,
+                },
+                "deals": [],  # Statistics-only query, no full deals returned
             },
             ensure_ascii=False,
             indent=2,
@@ -924,10 +968,18 @@ def get_market_activity_metrics(address: str, years_back: int = 2, radius_meters
         if not deals:
             return json.dumps(
                 {
-                    "address": address,
+                    "analysis_parameters": {
+                        "address": address,
+                        "years_back": years_back,
+                        "radius_meters": radius_meters,
+                    },
+                    "market_statistics": {
+                        "deal_breakdown": {
+                            "total_deals": 0,
+                        },
+                    },
+                    "deals": [],
                     "error": "No deals found for analysis",
-                    "years_back": years_back,
-                    "radius_meters": radius_meters,
                 },
                 ensure_ascii=False,
                 indent=2,
@@ -938,13 +990,19 @@ def get_market_activity_metrics(address: str, years_back: int = 2, radius_meters
         liquidity_metrics = _safe_calculate_metric(client.get_market_liquidity, deals)
         investment_metrics = _safe_calculate_metric(client.analyze_investment_potential, deals)
 
-        # Combine all metrics
+        # Combine all metrics with normalized structure
         return json.dumps(
             {
-                "address": address,
-                "years_back": years_back,
-                "radius_meters": radius_meters,
-                "total_deals_analyzed": len(deals),
+                "analysis_parameters": {
+                    "address": address,
+                    "years_back": years_back,
+                    "radius_meters": radius_meters,
+                },
+                "market_statistics": {
+                    "deal_breakdown": {
+                        "total_deals": len(deals),
+                    },
+                },
                 "market_activity": activity_metrics,
                 "market_liquidity": liquidity_metrics,
                 "investment_potential": investment_metrics,
@@ -957,6 +1015,7 @@ def get_market_activity_metrics(address: str, years_back: int = 2, radius_meters
                     "price_trend": investment_metrics.get("price_trend"),
                     "market_stability": investment_metrics.get("market_stability"),
                 },
+                "deals": [],  # Activity metrics don't return raw deals
             },
             ensure_ascii=False,
             indent=2,

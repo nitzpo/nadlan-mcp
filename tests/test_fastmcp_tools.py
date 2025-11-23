@@ -364,10 +364,13 @@ class TestGetValuationComparables:
         )
         parsed = json.loads(result)
 
-        assert "filters_applied" in parsed
-        assert "statistics" in parsed
-        assert "comparables" in parsed
-        assert parsed["filters_applied"]["property_type"] == "דירה"
+        # Normalized structure: filters_applied is now in search_parameters
+        assert "search_parameters" in parsed
+        assert "filters_applied" in parsed["search_parameters"]
+        assert parsed["search_parameters"]["filters_applied"]["property_type"] == "דירה"
+        # Normalized structure: comparables -> deals
+        assert "deals" in parsed
+        assert "market_statistics" in parsed
 
     @patch("nadlan_mcp.fastmcp_server.client")
     def test_comparables_strips_bloat(self, mock_client):
@@ -392,7 +395,8 @@ class TestGetValuationComparables:
         result = fastmcp_server.get_valuation_comparables("test address")
         parsed = json.loads(result)
 
-        comparable = parsed["comparables"][0]
+        # Normalized structure: comparables -> deals
+        comparable = parsed["deals"][0]
         assert "shape" not in comparable
         assert "sourceorder" not in comparable
         # source_polygon_id is kept when added by processing
@@ -421,9 +425,12 @@ class TestGetDealStatistics:
         result = fastmcp_server.get_deal_statistics("test address")
         parsed = json.loads(result)
 
-        assert "address" in parsed
-        assert "statistics" in parsed
-        assert parsed["statistics"]["total_deals"] == 2  # Field name is total_deals in model
+        # Normalized structure: address is now in search_parameters, statistics -> market_statistics
+        assert "search_parameters" in parsed
+        assert "address" in parsed["search_parameters"]
+        assert "market_statistics" in parsed
+        assert "deal_breakdown" in parsed["market_statistics"]
+        assert parsed["market_statistics"]["deal_breakdown"]["total_deals"] == 2
 
 
 class TestGetMarketActivityMetrics:

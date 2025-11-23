@@ -75,11 +75,12 @@ class TestMCPToolsE2E:
         result = analyze_market_trends(self.TEST_ADDRESS_1, years_back=3, radius_meters=100)
         data = json.loads(result)
 
-        # Check response structure
-        assert "market_summary" in data
-        assert "total_deals" in data["market_summary"]
-        assert isinstance(data["market_summary"]["total_deals"], int)
-        assert data["market_summary"]["total_deals"] >= 0
+        # Check response structure (normalized in MCP_NORMALIZATION_FIX)
+        assert "market_statistics" in data
+        assert "deal_breakdown" in data["market_statistics"]
+        assert "total_deals" in data["market_statistics"]["deal_breakdown"]
+        assert isinstance(data["market_statistics"]["deal_breakdown"]["total_deals"], int)
+        assert data["market_statistics"]["deal_breakdown"]["total_deals"] >= 0
 
     def test_get_valuation_comparables(self):
         """Test getting valuation comparables."""
@@ -88,13 +89,17 @@ class TestMCPToolsE2E:
         )
         data = json.loads(result)
 
-        assert "total_comparables" in data
-        assert isinstance(data["total_comparables"], int)
-        assert data["total_comparables"] >= 0
+        # Normalized structure: total_comparables -> market_statistics.deal_breakdown.total_deals
+        assert "market_statistics" in data
+        assert "deal_breakdown" in data["market_statistics"]
+        assert "total_deals" in data["market_statistics"]["deal_breakdown"]
+        assert isinstance(data["market_statistics"]["deal_breakdown"]["total_deals"], int)
+        assert data["market_statistics"]["deal_breakdown"]["total_deals"] >= 0
 
-        if data["total_comparables"] > 0:
-            assert "comparables" in data
-            comp = data["comparables"][0]
+        # Normalized structure: comparables -> deals
+        if data["market_statistics"]["deal_breakdown"]["total_deals"] > 0:
+            assert "deals" in data
+            comp = data["deals"][0]
             assert "deal_amount" in comp
             # rooms field is optional and excluded when None
             # Just verify the comparable has basic required fields
@@ -105,11 +110,13 @@ class TestMCPToolsE2E:
         result = get_deal_statistics(self.TEST_ADDRESS_1, years_back=3)
         data = json.loads(result)
 
-        # Check response structure
-        assert "statistics" in data
-        if "sample_size" in data["statistics"]:
-            assert isinstance(data["statistics"]["sample_size"], int)
-            assert data["statistics"]["sample_size"] >= 0
+        # Check response structure (normalized: statistics -> market_statistics)
+        assert "market_statistics" in data
+        # Check for total_deals in normalized location
+        if "deal_breakdown" in data["market_statistics"]:
+            assert "total_deals" in data["market_statistics"]["deal_breakdown"]
+            assert isinstance(data["market_statistics"]["deal_breakdown"]["total_deals"], int)
+            assert data["market_statistics"]["deal_breakdown"]["total_deals"] >= 0
 
     def test_get_market_activity_metrics(self):
         """Test market activity metrics."""
