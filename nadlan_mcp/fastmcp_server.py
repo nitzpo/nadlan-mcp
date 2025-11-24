@@ -941,7 +941,7 @@ def _safe_calculate_metric(metric_func, deals):
 
     Returns:
         Result dictionary from metric_func (serialized from Pydantic model),
-        or error dictionary if ValueError raised
+        or error dictionary if any exception raised
     """
     try:
         result = metric_func(deals)
@@ -949,7 +949,8 @@ def _safe_calculate_metric(metric_func, deals):
         if hasattr(result, "model_dump"):
             return result.model_dump(exclude_none=True)
         return result
-    except ValueError as e:
+    except Exception as e:
+        logger.warning(f"Error calculating metric {metric_func.__name__}: {e}")
         return {"error": str(e)}
 
 
