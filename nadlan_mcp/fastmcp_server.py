@@ -13,8 +13,10 @@ from typing import Any, Dict, List, Optional
 from mcp.server.fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
+from nadlan_mcp.config import get_config
 from nadlan_mcp.govmap import GovmapClient
 from nadlan_mcp.govmap.models import Deal
+from nadlan_mcp.govmap.outlier_detection import filter_deals_for_analysis
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -790,6 +792,16 @@ def get_valuation_comparables(
             min_floor=min_floor,
             max_floor=max_floor,
         )
+
+        # Apply outlier filtering to remove statistical outliers
+        config = get_config()
+        if (
+            config.analysis_outlier_method != "none"
+            and len(filtered_deals) >= config.analysis_min_deals_for_outlier_detection
+        ):
+            filtered_deals, outlier_report = filter_deals_for_analysis(
+                filtered_deals, config, metric="price_per_sqm"
+            )
 
         # Calculate statistics on filtered comparables
         stats = client.calculate_deal_statistics(filtered_deals)
