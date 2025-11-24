@@ -95,6 +95,14 @@ class GovmapConfig:
         == "true"
     )
 
+    # Distance Filtering for Deal Relevance
+    max_street_deal_distance_meters: int = field(
+        default_factory=lambda: int(os.getenv("MAX_STREET_DEAL_DISTANCE_METERS", "500"))
+    )
+    max_neighborhood_deal_distance_meters: int = field(
+        default_factory=lambda: int(os.getenv("MAX_NEIGHBORHOOD_DEAL_DISTANCE_METERS", "1000"))
+    )
+
     # User agent
     user_agent: str = field(
         default_factory=lambda: os.getenv("GOVMAP_USER_AGENT", "NadlanMCP/1.0.0")

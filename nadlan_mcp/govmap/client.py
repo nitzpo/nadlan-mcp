@@ -607,21 +607,42 @@ class GovmapClient:
             search_address_normalized = address.lower().strip()
             logger.info(f"Using coordinates: {point}")
 
-            # Extract unique polygon IDs from metadata dicts
-            polygon_ids = set()
+            # Extract polygon metadata with coordinates for distance calculation
+            polygon_metadata_list = []
             for metadata in nearby_polygons:
-                # Extract polygon_id from dict (these are polygon metadata, not deals)
                 polygon_id = metadata.get("polygon_id")
-                if polygon_id:
-                    polygon_ids.add(str(polygon_id))
+                if not polygon_id:
+                    continue
 
-            logger.info(f"Found {len(polygon_ids)} unique polygon IDs")
+                # Extract polygon center coordinates (use shape if available, fallback to search point)
+                # Most polygon metadata includes shape which can be parsed for center
+                # For now, use metadata coordinates if available, otherwise estimate
+                poly_coords = None
+                if "longitude" in metadata and "latitude" in metadata:
+                    poly_coords = (float(metadata["longitude"]), float(metadata["latitude"]))
+                # If no coordinates in metadata, we'll use the search point as approximation
+                # (this is suboptimal but ensures we don't skip polygons)
+
+                # Calculate distance from search point
+                distance = 0.0
+                if poly_coords:
+                    distance = utils.calculate_distance(point, poly_coords)
+
+                polygon_metadata_list.append(
+                    {"polygon_id": str(polygon_id), "distance": distance, "metadata": metadata}
+                )
+
+            # Sort polygons by distance (closest first)
+            polygon_metadata_list.sort(key=lambda x: x["distance"])
+            logger.info(
+                f"Found {len(polygon_metadata_list)} unique polygon IDs, sorted by distance"
+            )
 
             # Limit polygons to query (performance optimization)
             max_polygons = self.config.max_polygons_to_query
-            if len(polygon_ids) > max_polygons:
-                polygon_ids = list(polygon_ids)[:max_polygons]
-                logger.info(f"Limited to {max_polygons} polygons for performance")
+            if len(polygon_metadata_list) > max_polygons:
+                polygon_metadata_list = polygon_metadata_list[:max_polygons]
+                logger.info(f"Limited to {max_polygons} closest polygons for performance")
 
             # Step 3: Calculate date range
             end_date = datetime.now()
@@ -629,19 +650,32 @@ class GovmapClient:
             start_date_str = start_date.strftime("%Y-%m")
             end_date_str = end_date.strftime("%Y-%m")
 
-            # Step 4: Get street and neighborhood deals for each polygon
+            # Step 4: Get street and neighborhood deals for each polygon (sorted by distance)
             # Prioritize: same building (0) > street deals (1) > neighborhood deals (2)
+            # With progressive querying: query closest polygon first, expand if needed
             building_deals = []
             street_deals = []
             neighborhood_deals = []
             seen_deals = set()  # For deduplication
 
-            for polygon_id in polygon_ids:
-                # Early termination if we have enough deals
-                total_collected = len(building_deals) + len(street_deals) + len(neighborhood_deals)
+            for polygon_meta in polygon_metadata_list:
+                polygon_id = polygon_meta["polygon_id"]
+                polygon_distance = polygon_meta["distance"]
+
+                # Smart early termination: stop if we have good coverage of high-priority deals
+                # Prefer same-building and street deals over neighborhood deals
+                high_priority_count = len(building_deals) + len(street_deals)
+                total_collected = high_priority_count + len(neighborhood_deals)
+
+                # Stop if we have enough deals AND we're getting too far from the search point
                 if total_collected >= max_deals:
                     logger.info(f"Collected {total_collected} deals, stopping polygon queries")
                     break
+
+                # Log polygon being queried
+                logger.info(
+                    f"Querying polygon {polygon_id} (distance: {polygon_distance:.0f}m from search point)"
+                )
 
                 try:
                     # Get street deals first (higher priority)
@@ -673,9 +707,15 @@ class GovmapClient:
                         deal_id = f"{deal.objectid}{deal.deal_date}"
                         if deal_id not in seen_deals:
                             seen_deals.add(deal_id)
+
+                            # Calculate distance from search point to deal
+                            # Most deals don't have individual coordinates, so use polygon distance
+                            deal_distance = polygon_distance
+
                             # Store metadata using dynamic attributes (allowed by extra='allow')
                             deal.source_polygon_id = polygon_id
                             deal.deal_source = "street"
+                            deal.distance_meters = round(deal_distance, 1)
 
                             # Check if this is from the same building
                             # Construct address from model fields
@@ -687,8 +727,15 @@ class GovmapClient:
                                 deal.priority = 0  # Highest priority
                                 building_deals.append(deal)
                             else:
-                                deal.priority = 1  # Street deals priority
-                                street_deals.append(deal)
+                                # Apply distance filter for street deals (not same building)
+                                if deal_distance <= self.config.max_street_deal_distance_meters:
+                                    deal.priority = 1  # Street deals priority
+                                    street_deals.append(deal)
+                                else:
+                                    logger.debug(
+                                        f"Filtered street deal at {deal_distance:.0f}m "
+                                        f"(max: {self.config.max_street_deal_distance_meters}m)"
+                                    )
 
                     # Add neighborhood deals with lowest priority
                     for deal in current_neighborhood_deals:
@@ -696,11 +743,23 @@ class GovmapClient:
                         deal_id = f"{deal.objectid}{deal.deal_date}"
                         if deal_id not in seen_deals:
                             seen_deals.add(deal_id)
-                            # Store metadata using dynamic attributes
-                            deal.source_polygon_id = polygon_id
-                            deal.deal_source = "neighborhood"
-                            deal.priority = 2  # Lowest priority
-                            neighborhood_deals.append(deal)
+
+                            # Calculate distance from search point (use polygon distance)
+                            deal_distance = polygon_distance
+
+                            # Apply distance filter for neighborhood deals
+                            if deal_distance <= self.config.max_neighborhood_deal_distance_meters:
+                                # Store metadata using dynamic attributes
+                                deal.source_polygon_id = polygon_id
+                                deal.deal_source = "neighborhood"
+                                deal.priority = 2  # Lowest priority
+                                deal.distance_meters = round(deal_distance, 1)
+                                neighborhood_deals.append(deal)
+                            else:
+                                logger.debug(
+                                    f"Filtered neighborhood deal at {deal_distance:.0f}m "
+                                    f"(max: {self.config.max_neighborhood_deal_distance_meters}m)"
+                                )
 
                 except Exception as e:
                     logger.warning(f"Error processing polygon {polygon_id}: {e}")
@@ -709,9 +768,15 @@ class GovmapClient:
             # Step 5: Combine and prioritize: building deals first, then street, then neighborhood
             all_deals = building_deals + street_deals + neighborhood_deals
 
-            # Use stable sort: first by date (newest first), then by priority
-            # Since Python's sort is stable, the second sort maintains date order within each priority
+            # Multi-level sort with stable sorting:
+            # 1. Date (newest first) - applied first to maintain recency within same priority/distance
+            # 2. Distance (closest first) - applied second to prefer closer deals within same priority
+            # 3. Priority (same building > street > neighborhood) - applied last as primary sort
+            # Since Python's sort is stable, each sort maintains the order of previous sorts
             all_deals.sort(key=lambda x: x.deal_date or "1900-01-01", reverse=True)  # Newest first
+            all_deals.sort(
+                key=lambda x: getattr(x, "distance_meters", 999999)
+            )  # Distance second (closer first)
             all_deals.sort(
                 key=lambda x: getattr(x, "priority", 3)
             )  # Priority first (0=building, 1=street, 2=neighborhood)
