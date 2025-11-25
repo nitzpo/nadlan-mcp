@@ -718,9 +718,17 @@ class GovmapClient:
                             deal.distance_meters = round(deal_distance, 1)
 
                             # Check if this is from the same building
-                            # Construct address from model fields
-                            street = deal.street_name or ""
-                            house_num = str(deal.house_number or "")
+                            # Construct address from model fields (try multiple field names)
+                            # API returns streetNameHeb/streetNameEng and houseNum
+                            street = (
+                                getattr(deal, "streetNameHeb", None)
+                                or getattr(deal, "streetNameEng", None)
+                                or deal.street_name
+                                or ""
+                            )
+                            house_num = str(
+                                getattr(deal, "houseNum", None) or deal.house_number or ""
+                            )
                             deal_address = f"{street} {house_num}".lower().strip()
                             if self._is_same_building(search_address_normalized, deal_address):
                                 deal.deal_source = "same_building"
