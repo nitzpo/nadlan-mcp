@@ -849,6 +849,7 @@ def get_valuation_comparables(
             )
 
         # Apply filters
+        logger.info(f"Applying criteria filters to {len(deals)} deals")
         filtered_deals = client.filter_deals_by_criteria(
             deals,
             property_type=property_type,
@@ -861,6 +862,10 @@ def get_valuation_comparables(
             min_floor=min_floor,
             max_floor=max_floor,
         )
+        logger.info(
+            f"After criteria filtering: {len(filtered_deals)} deals "
+            f"(removed {len(deals) - len(filtered_deals)} deals)"
+        )
 
         # Apply outlier filtering to remove statistical outliers
         config = get_config()
@@ -869,8 +874,18 @@ def get_valuation_comparables(
             config.analysis_outlier_method != "none"
             and len(filtered_deals) >= config.analysis_min_deals_for_outlier_detection
         ):
+            deals_before_outlier_filter = len(filtered_deals)
             filtered_deals, outlier_report = filter_deals_for_analysis(
                 filtered_deals, config, metric="price_per_sqm"
+            )
+            logger.info(
+                f"After outlier filtering ({config.analysis_outlier_method}, k={config.analysis_iqr_multiplier}): "
+                f"{len(filtered_deals)} deals (removed {deals_before_outlier_filter - len(filtered_deals)} outliers)"
+            )
+        else:
+            logger.info(
+                f"Skipping outlier filtering: only {len(filtered_deals)} deals "
+                f"(minimum {config.analysis_min_deals_for_outlier_detection} required)"
             )
 
         # Calculate statistics on filtered comparables
