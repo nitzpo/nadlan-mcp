@@ -92,12 +92,24 @@ class TestMCPToolsE2E:
         # Normalized structure: total_comparables -> market_statistics.deal_breakdown.total_deals
         assert "market_statistics" in data
         assert "deal_breakdown" in data["market_statistics"]
-        assert "total_deals" in data["market_statistics"]["deal_breakdown"]
-        assert isinstance(data["market_statistics"]["deal_breakdown"]["total_deals"], int)
-        assert data["market_statistics"]["deal_breakdown"]["total_deals"] >= 0
+        deal_breakdown = data["market_statistics"]["deal_breakdown"]
+        assert "total_deals" in deal_breakdown
+        assert isinstance(deal_breakdown["total_deals"], int)
+        assert deal_breakdown["total_deals"] >= 0
+
+        # Verify outlier filtering metadata is included when filtering is applied
+        if "outliers_removed" in deal_breakdown:
+            assert isinstance(deal_breakdown["outliers_removed"], int)
+            assert deal_breakdown["outliers_removed"] >= 0
+            assert "total_deals_before_filtering" in deal_breakdown
+            assert "filtering_method" in deal_breakdown
+            assert deal_breakdown["filtering_method"] in ["iqr", "percent", "none"]
+            if deal_breakdown["filtering_method"] == "iqr":
+                assert "iqr_multiplier" in deal_breakdown
+                assert isinstance(deal_breakdown["iqr_multiplier"], (int, float))
 
         # Normalized structure: comparables -> deals
-        if data["market_statistics"]["deal_breakdown"]["total_deals"] > 0:
+        if deal_breakdown["total_deals"] > 0:
             assert "deals" in data
             comp = data["deals"][0]
             assert "deal_amount" in comp

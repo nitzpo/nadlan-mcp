@@ -776,8 +776,9 @@ def get_valuation_comparables(
     """Get comparable properties for valuation analysis.
 
     This tool provides detailed comparable deals filtered by your criteria.
-    Returns a generous number of comparables by default - the LLM analyzing
-    the results can determine which are most similar based on the full details.
+    Automatically applies IQR outlier filtering (k=1.5) to remove statistical outliers
+    and improve data quality. The response includes metadata about filtering so you can
+    inform users about removed outliers.
 
     Args:
         address: The address to find comparables for (in Hebrew or English)
@@ -795,8 +796,14 @@ def get_valuation_comparables(
         max_comparables: Maximum number of deals to return (default: 50, optimized for MCP token limits)
 
     Returns:
-        JSON string containing filtered comparable deals with full details.
-        Returns many comparables so LLM can assess similarity and relevance.
+        JSON string containing:
+        - Filtered comparable deals with full details
+        - deal_breakdown with outlier filtering metadata:
+          - total_deals: Count after filtering
+          - total_deals_before_filtering: Count before filtering
+          - outliers_removed: Number of deals filtered out
+          - filtering_method: Method used (e.g., "iqr")
+          - iqr_multiplier: IQR multiplier used (e.g., 1.5)
     """
     log_mcp_call(
         "get_valuation_comparables",
@@ -857,6 +864,7 @@ def get_valuation_comparables(
 
         # Apply outlier filtering to remove statistical outliers
         config = get_config()
+        outlier_report = None
         if (
             config.analysis_outlier_method != "none"
             and len(filtered_deals) >= config.analysis_min_deals_for_outlier_detection
@@ -867,6 +875,19 @@ def get_valuation_comparables(
 
         # Calculate statistics on filtered comparables
         stats = client.calculate_deal_statistics(filtered_deals)
+
+        # Build deal breakdown with outlier filtering information
+        deal_breakdown = {
+            "total_deals": len(filtered_deals),
+        }
+
+        # Add outlier filtering metadata if filtering was applied
+        if outlier_report:
+            deal_breakdown["total_deals_before_filtering"] = outlier_report["total_deals"]
+            deal_breakdown["outliers_removed"] = outlier_report["outliers_removed"]
+            deal_breakdown["filtering_method"] = outlier_report["method_used"]
+            if outlier_report["method_used"] == "iqr":
+                deal_breakdown["iqr_multiplier"] = outlier_report["parameters"]["iqr_multiplier"]
 
         # Normalize response structure to match other tools
         return json.dumps(
@@ -885,9 +906,7 @@ def get_valuation_comparables(
                     },
                 },
                 "market_statistics": {
-                    "deal_breakdown": {
-                        "total_deals": len(filtered_deals),
-                    },
+                    "deal_breakdown": deal_breakdown,
                     "price_statistics": stats.price_statistics,
                     "area_statistics": stats.area_statistics,
                     "price_per_sqm_statistics": stats.price_per_sqm_statistics,
