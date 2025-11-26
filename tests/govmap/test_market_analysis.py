@@ -235,20 +235,39 @@ class TestCalculateMarketActivityScore:
 
     def test_market_activity_trend_stable(self):
         """Test trend detection - stable activity."""
-        # Same number of deals each month
-        deals = [
-            Deal(
-                objectid=i,
-                deal_amount=1000000,
-                deal_date=get_recent_date(months_ago=i),
-                asset_area=80,
+        # Create exactly one deal per month for 12 months using recent dates
+        # Use 15th of each month to ensure consistent month grouping
+        # Manually calculate year-month combinations going back 12 months
+        now = datetime.now()
+        current_year = now.year
+        current_month = now.month
+
+        deals = []
+        for i in range(12):
+            # Calculate year and month going backwards
+            month = current_month - i
+            year = current_year
+            while month <= 0:
+                month += 12
+                year -= 1
+
+            deals.append(
+                Deal(
+                    objectid=i,
+                    deal_amount=1000000,
+                    deal_date=datetime(year, month, 15).date(),
+                    asset_area=80,
+                )
             )
-            for i in range(12)
-        ]
+
         score = calculate_market_activity_score(deals, time_period_months=12)
 
-        # With evenly distributed deals, trend could be stable or slightly increasing
-        assert score.trend in ["stable", "increasing"]
+        # With exactly 1 deal per month evenly distributed:
+        # First half (older 6 months): 6 deals / 6 months = 1.0 avg
+        # Second half (recent 6 months): 6 deals / 6 months = 1.0 avg
+        # Change ratio: (1.0 - 1.0) / 1.0 = 0.0
+        # Since 0.0 is between -0.15 and 0.15, trend should be "stable"
+        assert score.trend == "stable"
 
     def test_market_activity_insufficient_data_for_trend(self):
         """Test trend with insufficient data."""
