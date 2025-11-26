@@ -29,6 +29,29 @@ mcp = FastMCP("nadlan-mcp")
 client = GovmapClient()
 
 
+def log_mcp_call(func_name: str, **params):
+    """
+    Log MCP tool function calls with their parameters for debugging and monitoring.
+
+    Args:
+        func_name: Name of the MCP tool function being called
+        **params: Keyword arguments passed to the function
+    """
+    # Format parameters for logging (truncate long strings)
+    formatted_params = {}
+    for key, value in params.items():
+        if isinstance(value, str) and len(value) > 100:
+            formatted_params[key] = f"{value[:97]}..."
+        elif isinstance(value, list) and len(value) > 5:
+            formatted_params[key] = f"[{len(value)} items]"
+        else:
+            formatted_params[key] = value
+
+    logger.info(
+        f"MCP tool called: {func_name}({', '.join(f'{k}={v}' for k, v in formatted_params.items())})"
+    )
+
+
 def strip_bloat_fields(deals: List[Deal]) -> List[Dict[str, Any]]:
     """
     Remove bloat fields from Deal models to reduce token usage in MCP responses.
@@ -70,6 +93,7 @@ def autocomplete_address(search_text: str) -> str:
     Returns:
         JSON string containing matching addresses with their coordinates
     """
+    log_mcp_call("autocomplete_address", search_text=search_text)
     try:
         response = client.autocomplete_address(search_text)
 
@@ -117,6 +141,9 @@ def get_deals_by_radius(latitude: float, longitude: float, radius_meters: int = 
     Returns:
         JSON string containing polygon metadata (areas with deals nearby)
     """
+    log_mcp_call(
+        "get_deals_by_radius", latitude=latitude, longitude=longitude, radius_meters=radius_meters
+    )
     try:
         # Note: GovmapClient expects (longitude, latitude) tuple
         # Returns polygon metadata dicts, not Deal objects
@@ -153,6 +180,7 @@ def get_street_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> s
     Returns:
         JSON string containing recent real estate deals for the street
     """
+    log_mcp_call("get_street_deals", polygon_id=polygon_id, limit=limit, deal_type=deal_type)
     try:
         deals = client.get_street_deals(polygon_id, limit, deal_type=deal_type)
 
@@ -218,6 +246,14 @@ def find_recent_deals_for_address(
     Returns:
         JSON string containing recent real estate deals for the address
     """
+    log_mcp_call(
+        "find_recent_deals_for_address",
+        address=address,
+        years_back=years_back,
+        radius_meters=radius_meters,
+        max_deals=max_deals,
+        deal_type=deal_type,
+    )
     try:
         deals = client.find_recent_deals_for_address(
             address, years_back, radius_meters, max_deals, deal_type
@@ -323,6 +359,7 @@ def get_neighborhood_deals(polygon_id: str, limit: int = 100, deal_type: int = 2
     Returns:
         JSON string containing recent real estate deals in the specified neighborhood
     """
+    log_mcp_call("get_neighborhood_deals", polygon_id=polygon_id, limit=limit, deal_type=deal_type)
     try:
         deals = client.get_neighborhood_deals(polygon_id, limit, deal_type=deal_type)
 
@@ -387,6 +424,14 @@ def analyze_market_trends(
     Returns:
         JSON string containing comprehensive market trend analysis (summarized data, not raw deals)
     """
+    log_mcp_call(
+        "analyze_market_trends",
+        address=address,
+        years_back=years_back,
+        radius_meters=radius_meters,
+        max_deals=max_deals,
+        deal_type=deal_type,
+    )
     try:
         # Get deals for the address with larger radius for trend analysis
         deals = client.find_recent_deals_for_address(
@@ -589,6 +634,7 @@ def compare_addresses(addresses: List[str]) -> str:
     Returns:
         JSON string containing comparative analysis of multiple addresses
     """
+    log_mcp_call("compare_addresses", addresses=addresses)
     try:
         comparisons = []
 
@@ -752,6 +798,22 @@ def get_valuation_comparables(
         JSON string containing filtered comparable deals with full details.
         Returns many comparables so LLM can assess similarity and relevance.
     """
+    log_mcp_call(
+        "get_valuation_comparables",
+        address=address,
+        years_back=years_back,
+        property_type=property_type,
+        min_rooms=min_rooms,
+        max_rooms=max_rooms,
+        min_price=min_price,
+        max_price=max_price,
+        min_area=min_area,
+        max_area=max_area,
+        min_floor=min_floor,
+        max_floor=max_floor,
+        radius_meters=radius_meters,
+        max_comparables=max_comparables,
+    )
     try:
         # Get all deals for the address with higher limits for valuation
         deals = client.find_recent_deals_for_address(
@@ -866,6 +928,14 @@ def get_deal_statistics(
     Returns:
         JSON string containing statistical metrics (mean, median, percentiles, etc.)
     """
+    log_mcp_call(
+        "get_deal_statistics",
+        address=address,
+        years_back=years_back,
+        property_type=property_type,
+        min_rooms=min_rooms,
+        max_rooms=max_rooms,
+    )
     try:
         # Get all deals for the address
         deals = client.find_recent_deals_for_address(address, years_back)
@@ -974,6 +1044,12 @@ def get_market_activity_metrics(address: str, years_back: int = 2, radius_meters
             - Investment potential analysis
             - Price appreciation and volatility
     """
+    log_mcp_call(
+        "get_market_activity_metrics",
+        address=address,
+        years_back=years_back,
+        radius_meters=radius_meters,
+    )
     try:
         # Get deals for the address
         deals = client.find_recent_deals_for_address(address, years_back, radius_meters)
