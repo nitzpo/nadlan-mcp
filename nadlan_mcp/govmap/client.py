@@ -608,11 +608,14 @@ class GovmapClient:
             logger.info(f"Using coordinates: {point}")
 
             # Extract polygon metadata with coordinates for distance calculation
-            polygon_metadata_list = []
+            # Use dict to deduplicate by polygon_id (keep closest occurrence)
+            polygon_dict = {}
             for metadata in nearby_polygons:
                 polygon_id = metadata.get("polygon_id")
                 if not polygon_id:
                     continue
+
+                polygon_id_str = str(polygon_id)
 
                 # Extract polygon center coordinates (use shape if available, fallback to search point)
                 # Most polygon metadata includes shape which can be parsed for center
@@ -628,9 +631,19 @@ class GovmapClient:
                 if poly_coords:
                     distance = utils.calculate_distance(point, poly_coords)
 
-                polygon_metadata_list.append(
-                    {"polygon_id": str(polygon_id), "distance": distance, "metadata": metadata}
-                )
+                # Deduplicate: keep the polygon with shortest distance if duplicate IDs exist
+                if (
+                    polygon_id_str not in polygon_dict
+                    or distance < polygon_dict[polygon_id_str]["distance"]
+                ):
+                    polygon_dict[polygon_id_str] = {
+                        "polygon_id": polygon_id_str,
+                        "distance": distance,
+                        "metadata": metadata,
+                    }
+
+            # Convert dict to list
+            polygon_metadata_list = list(polygon_dict.values())
 
             # Sort polygons by distance (closest first)
             polygon_metadata_list.sort(key=lambda x: x["distance"])
