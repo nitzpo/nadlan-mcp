@@ -252,7 +252,7 @@ The MCP now includes configurable outlier detection and robust statistical measu
 ```bash
 # Outlier Detection Strategy
 ANALYSIS_OUTLIER_METHOD=iqr          # Options: iqr, percent, none (default: iqr)
-ANALYSIS_IQR_MULTIPLIER=1.5          # 1.5=moderate, 3.0=conservative (default: 1.5)
+ANALYSIS_IQR_MULTIPLIER=1.0          # 1.0=aggressive, 1.5=moderate, 3.0=conservative (default: 1.0)
 ANALYSIS_MIN_DEALS_FOR_OUTLIER_DETECTION=10  # Minimum deals needed (default: 10)
 
 # Hard Bounds (catches obvious data errors)
@@ -273,9 +273,13 @@ ANALYSIS_INCLUDE_UNFILTERED_STATS=true  # Report both filtered/unfiltered (defau
 from nadlan_mcp.govmap.statistics import calculate_deal_statistics
 from nadlan_mcp.config import GovmapConfig
 
-# With outlier filtering (default behavior)
+# With outlier filtering (default behavior, k=1.0)
 config = GovmapConfig()  # Uses env vars or defaults
 stats = calculate_deal_statistics(deals, config)
+
+# Override IQR multiplier for more/less aggressive filtering
+stats = calculate_deal_statistics(deals, config, iqr_multiplier=1.5)  # More conservative
+stats = calculate_deal_statistics(deals, config, iqr_multiplier=0.5)  # More aggressive
 
 # Access filtered statistics (main results after outlier removal)
 filtered_mean = stats.filtered_price_per_sqm_statistics["mean"]
@@ -292,10 +296,10 @@ original_mean = stats.price_per_sqm_statistics["mean"]
 ```
 
 **Design Principles:**
-- **Enabled by default**: Moderate filtering (k=1.5) to catch common errors
+- **Enabled by default**: Aggressive filtering (k=1.0) to catch common errors & suspicious deals
 - **Transparent**: Both filtered and unfiltered statistics returned
 - **Conservative with real data**: Hard bounds + IQR preserve legitimate high-end properties
-- **Configurable**: Adjust sensitivity via environment variables
+- **Configurable**: Adjust sensitivity via environment variables or function parameters
 - **MCP provides data, LLM provides intelligence**: Outlier detection improves data quality; LLM interprets results
 
 ### Retry Logic

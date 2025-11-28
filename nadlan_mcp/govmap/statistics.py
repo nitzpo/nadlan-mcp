@@ -152,7 +152,7 @@ def _calculate_basic_stats(deals: List[Deal]) -> Dict:
 
 
 def calculate_deal_statistics(
-    deals: List[Deal], config: Optional[GovmapConfig] = None
+    deals: List[Deal], config: Optional[GovmapConfig] = None, iqr_multiplier: Optional[float] = None
 ) -> DealStatistics:
     """
     Calculate statistical aggregations on deal data with optional outlier filtering.
@@ -164,6 +164,7 @@ def calculate_deal_statistics(
     Args:
         deals: List of Deal model instances
         config: Configuration object (optional, uses global config if not provided)
+        iqr_multiplier: Override IQR multiplier (optional, uses config value if not provided)
 
     Returns:
         DealStatistics model with comprehensive metrics, including:
@@ -203,7 +204,7 @@ def calculate_deal_statistics(
     ):
         # Filter deals for analysis (primarily targeting price_per_sqm outliers)
         filtered_deals, report_dict = filter_deals_for_analysis(
-            deals, config, metric="price_per_sqm"
+            deals, config, metric="price_per_sqm", iqr_multiplier=iqr_multiplier
         )
 
         # Create OutlierReport model

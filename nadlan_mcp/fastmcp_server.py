@@ -772,11 +772,12 @@ def get_valuation_comparables(
     max_floor: Optional[int] = None,
     radius_meters: int = 100,
     max_comparables: int = 50,
+    iqr_multiplier: Optional[float] = None,
 ) -> str:
     """Get comparable properties for valuation analysis.
 
     This tool provides detailed comparable deals filtered by your criteria.
-    Automatically applies IQR outlier filtering (k=1.5) to remove statistical outliers
+    Automatically applies IQR outlier filtering (k=1.0 default) to remove statistical outliers
     and improve data quality. The response includes metadata about filtering so you can
     inform users about removed outliers.
 
@@ -794,6 +795,7 @@ def get_valuation_comparables(
         max_floor: Maximum floor number
         radius_meters: Search radius in meters (default: 100, larger than find_recent_deals to get more comparables)
         max_comparables: Maximum number of deals to return (default: 50, optimized for MCP token limits)
+        iqr_multiplier: Override IQR multiplier for outlier detection (default: 1.0). Lower = more aggressive filtering
 
     Returns:
         JSON string containing:
@@ -803,7 +805,7 @@ def get_valuation_comparables(
           - total_deals_before_filtering: Count before filtering
           - outliers_removed: Number of deals filtered out
           - filtering_method: Method used (e.g., "iqr")
-          - iqr_multiplier: IQR multiplier used (e.g., 1.5)
+          - iqr_multiplier: IQR multiplier used (e.g., 1.0)
     """
     log_mcp_call(
         "get_valuation_comparables",
@@ -820,6 +822,7 @@ def get_valuation_comparables(
         max_floor=max_floor,
         radius_meters=radius_meters,
         max_comparables=max_comparables,
+        iqr_multiplier=iqr_multiplier,
     )
     try:
         # Get all deals for the address with higher limits for valuation
@@ -876,10 +879,13 @@ def get_valuation_comparables(
         ):
             deals_before_outlier_filter = len(filtered_deals)
             filtered_deals, outlier_report = filter_deals_for_analysis(
-                filtered_deals, config, metric="price_per_sqm"
+                filtered_deals, config, metric="price_per_sqm", iqr_multiplier=iqr_multiplier
+            )
+            effective_k = (
+                iqr_multiplier if iqr_multiplier is not None else config.analysis_iqr_multiplier
             )
             logger.info(
-                f"After outlier filtering ({config.analysis_outlier_method}, k={config.analysis_iqr_multiplier}): "
+                f"After outlier filtering ({config.analysis_outlier_method}, k={effective_k}): "
                 f"{len(filtered_deals)} deals (removed {deals_before_outlier_filter - len(filtered_deals)} outliers)"
             )
         else:
@@ -946,6 +952,7 @@ def get_deal_statistics(
     property_type: Optional[str] = None,
     min_rooms: Optional[float] = None,
     max_rooms: Optional[float] = None,
+    iqr_multiplier: Optional[float] = None,
 ) -> str:
     """Calculate statistical aggregations on deal data for an address.
 
@@ -958,6 +965,7 @@ def get_deal_statistics(
         property_type: Filter by property type (e.g., "דירה", "בית")
         min_rooms: Minimum number of rooms
         max_rooms: Maximum number of rooms
+        iqr_multiplier: Override IQR multiplier for outlier detection (default: 1.0). Lower = more aggressive filtering
 
     Returns:
         JSON string containing statistical metrics (mean, median, percentiles, etc.)
@@ -969,6 +977,7 @@ def get_deal_statistics(
         property_type=property_type,
         min_rooms=min_rooms,
         max_rooms=max_rooms,
+        iqr_multiplier=iqr_multiplier,
     )
     try:
         # Get all deals for the address
@@ -998,7 +1007,7 @@ def get_deal_statistics(
             )
 
         # Calculate statistics
-        stats = client.calculate_deal_statistics(deals)
+        stats = client.calculate_deal_statistics(deals, iqr_multiplier=iqr_multiplier)
 
         # Normalize response structure to match other tools
         return json.dumps(

@@ -61,7 +61,7 @@ class GovmapConfig:
         default_factory=lambda: os.getenv("ANALYSIS_OUTLIER_METHOD", "iqr")
     )
     analysis_iqr_multiplier: float = field(
-        default_factory=lambda: float(os.getenv("ANALYSIS_IQR_MULTIPLIER", "1.5"))
+        default_factory=lambda: float(os.getenv("ANALYSIS_IQR_MULTIPLIER", "1.0"))
     )
     analysis_min_deals_for_outlier_detection: int = field(
         default_factory=lambda: int(os.getenv("ANALYSIS_MIN_DEALS_FOR_OUTLIER_DETECTION", "10"))

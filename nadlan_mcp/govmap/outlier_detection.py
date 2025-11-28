@@ -173,7 +173,10 @@ def apply_hard_bounds_deal_amount(
 
 
 def filter_deals_for_analysis(
-    deals: List[Deal], config: Optional[GovmapConfig] = None, metric: str = "price_per_sqm"
+    deals: List[Deal],
+    config: Optional[GovmapConfig] = None,
+    metric: str = "price_per_sqm",
+    iqr_multiplier: Optional[float] = None,
 ) -> Tuple[List[Deal], Dict[str, Any]]:
     """
     Filter deals to remove outliers based on configuration.
@@ -192,6 +195,7 @@ def filter_deals_for_analysis(
         config: Configuration object (optional, uses global if not provided)
         metric: Which metric to apply statistical outlier detection to
                 Options: "price_per_sqm", "deal_amount"
+        iqr_multiplier: Override IQR multiplier (optional, uses config value if not provided)
 
     Returns:
         Tuple of:
@@ -239,6 +243,11 @@ def filter_deals_for_analysis(
             filters_to_remove[i] = True
 
     # Step 3: Apply statistical outlier detection to specified metric
+    # Use override value if provided, otherwise use config
+    effective_iqr_multiplier = (
+        iqr_multiplier if iqr_multiplier is not None else config.analysis_iqr_multiplier
+    )
+
     if config.analysis_outlier_method == "iqr":
         # Extract values for the specified metric
         if metric == "price_per_sqm":
@@ -260,7 +269,7 @@ def filter_deals_for_analysis(
             value_indices = []
 
         if values:
-            statistical_outliers = detect_outliers_iqr(values, config.analysis_iqr_multiplier)
+            statistical_outliers = detect_outliers_iqr(values, effective_iqr_multiplier)
             for i, is_outlier in enumerate(statistical_outliers):
                 if is_outlier:
                     filters_to_remove[value_indices[i]] = True
@@ -302,7 +311,7 @@ def filter_deals_for_analysis(
         "outlier_indices": outlier_indices,
         "method_used": config.analysis_outlier_method,
         "parameters": {
-            "iqr_multiplier": config.analysis_iqr_multiplier
+            "iqr_multiplier": effective_iqr_multiplier
             if config.analysis_outlier_method == "iqr"
             else None,
             "metric": metric,
