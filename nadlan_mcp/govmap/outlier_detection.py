@@ -300,6 +300,36 @@ def filter_deals_for_analysis(
                 if is_outlier:
                     filters_to_remove[value_indices[i]] = True
 
+    # Step 4: Apply percentage-based backup filtering (catches extreme outliers in heterogeneous data)
+    # This runs in addition to IQR when enabled, providing a safety net for wide distributions
+    if config.analysis_use_percentage_backup and config.analysis_outlier_method == "iqr":
+        # Extract values for the specified metric (same logic as above)
+        if metric == "price_per_sqm":
+            values = [
+                deal.price_per_sqm
+                for i, deal in enumerate(deals)
+                if deal.price_per_sqm is not None and not filters_to_remove[i]
+            ]
+            value_indices = [
+                i
+                for i, deal in enumerate(deals)
+                if deal.price_per_sqm is not None and not filters_to_remove[i]
+            ]
+        elif metric == "deal_amount":
+            values = [deal.deal_amount for i, deal in enumerate(deals) if not filters_to_remove[i]]
+            value_indices = [i for i in range(len(deals)) if not filters_to_remove[i]]
+        else:
+            values = []
+            value_indices = []
+
+        if values:
+            percentage_outliers = detect_outliers_percent(
+                values, config.analysis_percentage_threshold
+            )
+            for i, is_outlier in enumerate(percentage_outliers):
+                if is_outlier:
+                    filters_to_remove[value_indices[i]] = True
+
     # Filter deals
     filtered_deals = [deal for i, deal in enumerate(deals) if not filters_to_remove[i]]
     outlier_indices = [i for i, should_remove in enumerate(filters_to_remove) if should_remove]
@@ -313,6 +343,12 @@ def filter_deals_for_analysis(
         "parameters": {
             "iqr_multiplier": effective_iqr_multiplier
             if config.analysis_outlier_method == "iqr"
+            else None,
+            "percentage_backup_enabled": config.analysis_use_percentage_backup
+            if config.analysis_outlier_method == "iqr"
+            else None,
+            "percentage_threshold": config.analysis_percentage_threshold
+            if config.analysis_use_percentage_backup and config.analysis_outlier_method == "iqr"
             else None,
             "metric": metric,
             "price_per_sqm_min": config.analysis_price_per_sqm_min,

@@ -244,6 +244,7 @@ The MCP now includes configurable outlier detection and robust statistical measu
 
 **Key Features:**
 - **IQR-based outlier detection**: Uses Interquartile Range (robust to skewed data)
+- **Percentage backup filtering**: Catches extreme outliers (>50% from median) in heterogeneous data
 - **Hard bounds filtering**: Removes obvious errors (price_per_sqm < 1K or > 100K NIS/sqm, deals < 100K NIS)
 - **Robust volatility**: Investment analysis uses IQR instead of std_dev for stability ratings
 - **Transparent reporting**: Returns both filtered and unfiltered statistics with outlier reports
@@ -254,6 +255,10 @@ The MCP now includes configurable outlier detection and robust statistical measu
 ANALYSIS_OUTLIER_METHOD=iqr          # Options: iqr, percent, none (default: iqr)
 ANALYSIS_IQR_MULTIPLIER=1.0          # 1.0=aggressive, 1.5=moderate, 3.0=conservative (default: 1.0)
 ANALYSIS_MIN_DEALS_FOR_OUTLIER_DETECTION=10  # Minimum deals needed (default: 10)
+
+# Percentage-based Backup Filtering (catches extreme outliers in heterogeneous data)
+ANALYSIS_USE_PERCENTAGE_BACKUP=true  # Enable percentage backup (default: true)
+ANALYSIS_PERCENTAGE_THRESHOLD=0.5    # Remove deals >50% from median (default: 0.5)
 
 # Hard Bounds (catches obvious data errors)
 ANALYSIS_PRICE_PER_SQM_MIN=1000      # 1K NIS/sqm minimum (default: 1000)
@@ -296,9 +301,10 @@ original_mean = stats.price_per_sqm_statistics["mean"]
 ```
 
 **Design Principles:**
-- **Enabled by default**: Aggressive filtering (k=1.0) to catch common errors & suspicious deals
+- **Dual filtering approach**: IQR (k=1.0) + percentage backup (50%) catch both mild and extreme outliers
+- **Handles heterogeneous data**: Percentage backup catches outliers when IQR becomes too permissive (mixed room counts, property types)
 - **Transparent**: Both filtered and unfiltered statistics returned
-- **Conservative with real data**: Hard bounds + IQR preserve legitimate high-end properties
+- **Conservative with real data**: Hard bounds + IQR + percentage preserve legitimate high-end properties
 - **Configurable**: Adjust sensitivity via environment variables or function parameters
 - **MCP provides data, LLM provides intelligence**: Outlier detection improves data quality; LLM interprets results
 

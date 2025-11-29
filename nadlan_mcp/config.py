@@ -67,6 +67,15 @@ class GovmapConfig:
         default_factory=lambda: int(os.getenv("ANALYSIS_MIN_DEALS_FOR_OUTLIER_DETECTION", "10"))
     )
 
+    # Percentage-based backup filtering (catches extreme outliers in heterogeneous data)
+    analysis_use_percentage_backup: bool = field(
+        default_factory=lambda: os.getenv("ANALYSIS_USE_PERCENTAGE_BACKUP", "true").lower()
+        == "true"
+    )
+    analysis_percentage_threshold: float = field(
+        default_factory=lambda: float(os.getenv("ANALYSIS_PERCENTAGE_THRESHOLD", "0.5"))
+    )
+
     # Hard Bounds for Price per Sqm (catches obvious data errors)
     analysis_price_per_sqm_min: float = field(
         default_factory=lambda: float(os.getenv("ANALYSIS_PRICE_PER_SQM_MIN", "1000"))
@@ -146,6 +155,8 @@ class GovmapConfig:
             raise ValueError("analysis_iqr_multiplier must be positive")
         if self.analysis_min_deals_for_outlier_detection < 0:
             raise ValueError("analysis_min_deals_for_outlier_detection must be non-negative")
+        if self.analysis_percentage_threshold <= 0 or self.analysis_percentage_threshold >= 1:
+            raise ValueError("analysis_percentage_threshold must be between 0 and 1")
         if self.analysis_price_per_sqm_min <= 0:
             raise ValueError("analysis_price_per_sqm_min must be positive")
         if self.analysis_price_per_sqm_max <= self.analysis_price_per_sqm_min:
