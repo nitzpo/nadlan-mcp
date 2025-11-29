@@ -73,7 +73,7 @@ class GovmapConfig:
         == "true"
     )
     analysis_percentage_threshold: float = field(
-        default_factory=lambda: float(os.getenv("ANALYSIS_PERCENTAGE_THRESHOLD", "0.5"))
+        default_factory=lambda: float(os.getenv("ANALYSIS_PERCENTAGE_THRESHOLD", "0.4"))
     )
 
     # Hard Bounds for Price per Sqm (catches obvious data errors)

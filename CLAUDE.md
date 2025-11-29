@@ -244,7 +244,7 @@ The MCP now includes configurable outlier detection and robust statistical measu
 
 **Key Features:**
 - **IQR-based outlier detection**: Uses Interquartile Range (robust to skewed data)
-- **Percentage backup filtering**: Catches extreme outliers (>50% from median) in heterogeneous data
+- **Percentage backup filtering**: Catches extreme outliers (>40% from median) in heterogeneous data
 - **Hard bounds filtering**: Removes obvious errors (price_per_sqm < 1K or > 100K NIS/sqm, deals < 100K NIS)
 - **Robust volatility**: Investment analysis uses IQR instead of std_dev for stability ratings
 - **Transparent reporting**: Returns both filtered and unfiltered statistics with outlier reports
@@ -258,7 +258,7 @@ ANALYSIS_MIN_DEALS_FOR_OUTLIER_DETECTION=10  # Minimum deals needed (default: 10
 
 # Percentage-based Backup Filtering (catches extreme outliers in heterogeneous data)
 ANALYSIS_USE_PERCENTAGE_BACKUP=true  # Enable percentage backup (default: true)
-ANALYSIS_PERCENTAGE_THRESHOLD=0.5    # Remove deals >50% from median (default: 0.5)
+ANALYSIS_PERCENTAGE_THRESHOLD=0.4    # Remove deals >40% from median (default: 0.4)
 
 # Hard Bounds (catches obvious data errors)
 ANALYSIS_PRICE_PER_SQM_MIN=1000      # 1K NIS/sqm minimum (default: 1000)
@@ -301,7 +301,7 @@ original_mean = stats.price_per_sqm_statistics["mean"]
 ```
 
 **Design Principles:**
-- **Dual filtering approach**: IQR (k=1.0) + percentage backup (50%) catch both mild and extreme outliers
+- **Dual filtering approach**: IQR (k=1.0) + percentage backup (40%) catch both mild and extreme outliers
 - **Handles heterogeneous data**: Percentage backup catches outliers when IQR becomes too permissive (mixed room counts, property types)
 - **Transparent**: Both filtered and unfiltered statistics returned
 - **Conservative with real data**: Hard bounds + IQR + percentage preserve legitimate high-end properties
