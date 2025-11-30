@@ -64,7 +64,7 @@ class GovmapConfig:
         default_factory=lambda: float(os.getenv("ANALYSIS_IQR_MULTIPLIER", "1.0"))
     )
     analysis_min_deals_for_outlier_detection: int = field(
-        default_factory=lambda: int(os.getenv("ANALYSIS_MIN_DEALS_FOR_OUTLIER_DETECTION", "10"))
+        default_factory=lambda: int(os.getenv("ANALYSIS_MIN_DEALS_FOR_OUTLIER_DETECTION", "5"))
     )
 
     # Percentage-based backup filtering (catches extreme outliers in heterogeneous data)

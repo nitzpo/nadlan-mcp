@@ -345,7 +345,7 @@ The MCP now includes configurable outlier detection and robust statistical measu
 # Outlier Detection Strategy
 ANALYSIS_OUTLIER_METHOD=iqr          # Options: iqr, percent, none (default: iqr)
 ANALYSIS_IQR_MULTIPLIER=1.0          # 1.0=aggressive, 1.5=moderate, 3.0=conservative (default: 1.0)
-ANALYSIS_MIN_DEALS_FOR_OUTLIER_DETECTION=10  # Minimum deals needed (default: 10)
+ANALYSIS_MIN_DEALS_FOR_OUTLIER_DETECTION=5  # Minimum deals needed (default: 5)
 
 # Percentage-based Backup Filtering (catches extreme outliers in heterogeneous data)
 ANALYSIS_USE_PERCENTAGE_BACKUP=true  # Enable percentage backup (default: true)
