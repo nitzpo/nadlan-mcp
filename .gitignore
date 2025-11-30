@@ -299,3 +299,6 @@ nadlan_mcp/local_settings.py
 
 # Phase summaries should stay in .cursor/plans/ only
 PHASE*.md
+
+# Archived files (historical reference, not tracked)
+.archive/
