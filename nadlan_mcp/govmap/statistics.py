@@ -152,7 +152,10 @@ def _calculate_basic_stats(deals: List[Deal]) -> Dict:
 
 
 def calculate_deal_statistics(
-    deals: List[Deal], config: Optional[GovmapConfig] = None, iqr_multiplier: Optional[float] = None
+    deals: List[Deal],
+    config: Optional[GovmapConfig] = None,
+    iqr_multiplier: Optional[float] = None,
+    include_outlier_deals: bool = True,
 ) -> DealStatistics:
     """
     Calculate statistical aggregations on deal data with optional outlier filtering.
@@ -165,12 +168,14 @@ def calculate_deal_statistics(
         deals: List of Deal model instances
         config: Configuration object (optional, uses global config if not provided)
         iqr_multiplier: Override IQR multiplier (optional, uses config value if not provided)
+        include_outlier_deals: If True (default), include the removed outlier deals in the outlier report
+                              This allows LLMs to see what was filtered out
 
     Returns:
         DealStatistics model with comprehensive metrics, including:
         - Original statistics (calculated on all deals)
         - Filtered statistics (calculated after outlier removal, if enabled)
-        - Outlier report (details on what was filtered, if enabled)
+        - Outlier report (details on what was filtered out, including outlier_deals if requested)
 
     Raises:
         ValueError: If deals is not a valid list
@@ -204,7 +209,11 @@ def calculate_deal_statistics(
     ):
         # Filter deals for analysis (primarily targeting price_per_sqm outliers)
         filtered_deals, report_dict = filter_deals_for_analysis(
-            deals, config, metric="price_per_sqm", iqr_multiplier=iqr_multiplier
+            deals,
+            config,
+            metric="price_per_sqm",
+            iqr_multiplier=iqr_multiplier,
+            include_outlier_deals=include_outlier_deals,
         )
 
         # Create OutlierReport model

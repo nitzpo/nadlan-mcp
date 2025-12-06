@@ -177,6 +177,7 @@ def filter_deals_for_analysis(
     config: Optional[GovmapConfig] = None,
     metric: str = "price_per_sqm",
     iqr_multiplier: Optional[float] = None,
+    include_outlier_deals: bool = True,
 ) -> Tuple[List[Deal], Dict[str, Any]]:
     """
     Filter deals to remove outliers based on configuration.
@@ -196,11 +197,13 @@ def filter_deals_for_analysis(
         metric: Which metric to apply statistical outlier detection to
                 Options: "price_per_sqm", "deal_amount"
         iqr_multiplier: Override IQR multiplier (optional, uses config value if not provided)
+        include_outlier_deals: If True, include the removed outlier deals in the report
+                              (default: True, allows LLM to see what was filtered out)
 
     Returns:
         Tuple of:
-        - Filtered list of deals
-        - Outlier report dict with details on what was filtered
+        - Filtered list of deals (deals that PASSED filtering)
+        - Outlier report dict with details on what was filtered out (includes outlier_deals if requested)
     """
     if config is None:
         config = get_config()
@@ -333,6 +336,7 @@ def filter_deals_for_analysis(
     # Filter deals
     filtered_deals = [deal for i, deal in enumerate(deals) if not filters_to_remove[i]]
     outlier_indices = [i for i, should_remove in enumerate(filters_to_remove) if should_remove]
+    outlier_deals = [deal for i, deal in enumerate(deals) if filters_to_remove[i]]
 
     # Create outlier report
     report = {
@@ -356,5 +360,9 @@ def filter_deals_for_analysis(
             "min_deal_amount": config.analysis_min_deal_amount,
         },
     }
+
+    # Include outlier deals if requested
+    if include_outlier_deals and outlier_deals:
+        report["outlier_deals"] = outlier_deals
 
     return filtered_deals, report

@@ -196,6 +196,7 @@ class OutlierReport(BaseModel):
         outlier_indices: Indices of removed deals in original list
         method_used: Outlier detection method ("iqr", "percent", "none")
         parameters: Configuration parameters used for detection
+        filtered_deals: The actual deals that were filtered out (optional)
     """
 
     total_deals: int = Field(..., description="Total deals before filtering")
@@ -204,6 +205,9 @@ class OutlierReport(BaseModel):
     method_used: str = Field(..., description="Detection method (iqr, percent, none)")
     parameters: Dict[str, Any] = Field(
         default_factory=dict, description="Detection parameters used"
+    )
+    outlier_deals: Optional[List["Deal"]] = Field(
+        None, description="Deals that were removed as outliers (if requested)"
     )
 
 

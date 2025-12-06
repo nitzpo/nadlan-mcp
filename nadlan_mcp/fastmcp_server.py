@@ -799,6 +799,7 @@ def get_valuation_comparables(
     radius_meters: int = 100,
     max_comparables: int = 50,
     iqr_multiplier: Optional[float] = None,
+    include_outlier_deals: bool = True,
 ) -> str:
     """Get comparable properties for valuation analysis.
 
@@ -822,16 +823,19 @@ def get_valuation_comparables(
         radius_meters: Search radius in meters (default: 100, larger than find_recent_deals to get more comparables)
         max_comparables: Maximum number of deals to return (default: 50, optimized for MCP token limits)
         iqr_multiplier: Override IQR multiplier for outlier detection (default: 1.0). Lower = more aggressive filtering
+        include_outlier_deals: If True (default), include the outlier deals separately in the response
+                              This allows you to see what was filtered out and answer questions about it
 
     Returns:
         JSON string containing:
-        - Filtered comparable deals with full details
+        - deals: Comparable deals that passed filtering
         - deal_breakdown with outlier filtering metadata:
           - total_deals: Count after filtering
           - total_deals_before_filtering: Count before filtering
-          - outliers_removed: Number of deals filtered out
+          - outliers_removed: Number of deals removed as outliers
           - filtering_method: Method used (e.g., "iqr")
           - iqr_multiplier: IQR multiplier used (e.g., 1.0)
+        - outlier_deals: List of deals that were removed as outliers (if include_outlier_deals=True)
     """
     log_mcp_call(
         "get_valuation_comparables",
@@ -905,7 +909,11 @@ def get_valuation_comparables(
         ):
             deals_before_outlier_filter = len(filtered_deals)
             filtered_deals, outlier_report = filter_deals_for_analysis(
-                filtered_deals, config, metric="price_per_sqm", iqr_multiplier=iqr_multiplier
+                filtered_deals,
+                config,
+                metric="price_per_sqm",
+                iqr_multiplier=iqr_multiplier,
+                include_outlier_deals=include_outlier_deals,
             )
             effective_k = (
                 iqr_multiplier if iqr_multiplier is not None else config.analysis_iqr_multiplier
@@ -936,35 +944,37 @@ def get_valuation_comparables(
             if outlier_report["method_used"] == "iqr":
                 deal_breakdown["iqr_multiplier"] = outlier_report["parameters"]["iqr_multiplier"]
 
-        # Normalize response structure to match other tools
-        return json.dumps(
-            {
-                "search_parameters": {
-                    "address": address,
-                    "years_back": years_back,
-                    "radius_meters": radius_meters,
-                    "max_comparables": max_comparables,
-                    "filters_applied": {
-                        "property_type": property_type,
-                        "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
-                        "price": f"{min_price}-{max_price}" if min_price or max_price else None,
-                        "area": f"{min_area}-{max_area}" if min_area or max_area else None,
-                        "floor": f"{min_floor}-{max_floor}" if min_floor or max_floor else None,
-                    },
+        # Build response with filtered deals
+        response_data = {
+            "search_parameters": {
+                "address": address,
+                "years_back": years_back,
+                "radius_meters": radius_meters,
+                "max_comparables": max_comparables,
+                "filters_applied": {
+                    "property_type": property_type,
+                    "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
+                    "price": f"{min_price}-{max_price}" if min_price or max_price else None,
+                    "area": f"{min_area}-{max_area}" if min_area or max_area else None,
+                    "floor": f"{min_floor}-{max_floor}" if min_floor or max_floor else None,
                 },
-                "market_statistics": {
-                    "deal_breakdown": deal_breakdown,
-                    "price_statistics": stats.price_statistics,
-                    "area_statistics": stats.area_statistics,
-                    "price_per_sqm_statistics": stats.price_per_sqm_statistics,
-                    "property_type_distribution": stats.property_type_distribution,
-                    "date_range": stats.date_range,
-                },
-                "deals": strip_bloat_fields(filtered_deals),
             },
-            ensure_ascii=False,
-            indent=2,
-        )
+            "market_statistics": {
+                "deal_breakdown": deal_breakdown,
+                "price_statistics": stats.price_statistics,
+                "area_statistics": stats.area_statistics,
+                "price_per_sqm_statistics": stats.price_per_sqm_statistics,
+                "property_type_distribution": stats.property_type_distribution,
+                "date_range": stats.date_range,
+            },
+            "deals": strip_bloat_fields(filtered_deals),
+        }
+
+        # Add outlier deals if present and requested
+        if include_outlier_deals and outlier_report and "outlier_deals" in outlier_report:
+            response_data["outlier_deals"] = strip_bloat_fields(outlier_report["outlier_deals"])
+
+        return json.dumps(response_data, ensure_ascii=False, indent=2)
 
     except Exception as e:
         logger.error(f"Error in get_valuation_comparables: {e}", exc_info=True)
@@ -979,6 +989,7 @@ def get_deal_statistics(
     min_rooms: Optional[float] = None,
     max_rooms: Optional[float] = None,
     iqr_multiplier: Optional[float] = None,
+    include_outlier_deals: bool = True,
 ) -> str:
     """Calculate statistical aggregations on deal data for an address.
 
@@ -992,9 +1003,13 @@ def get_deal_statistics(
         min_rooms: Minimum number of rooms
         max_rooms: Maximum number of rooms
         iqr_multiplier: Override IQR multiplier for outlier detection (default: 1.0). Lower = more aggressive filtering
+        include_outlier_deals: If True (default), include the outlier deals in the response
+                              This allows you to see what was filtered out
 
     Returns:
-        JSON string containing statistical metrics (mean, median, percentiles, etc.)
+        JSON string containing:
+        - market_statistics: Statistical metrics (mean, median, percentiles, etc.)
+        - outlier_deals: Deals that were removed as outliers (if include_outlier_deals=True)
     """
     log_mcp_call(
         "get_deal_statistics",
@@ -1033,34 +1048,38 @@ def get_deal_statistics(
             )
 
         # Calculate statistics
-        stats = client.calculate_deal_statistics(deals, iqr_multiplier=iqr_multiplier)
-
-        # Normalize response structure to match other tools
-        return json.dumps(
-            {
-                "search_parameters": {
-                    "address": address,
-                    "years_back": years_back,
-                    "filters_applied": {
-                        "property_type": property_type,
-                        "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
-                    },
-                },
-                "market_statistics": {
-                    "deal_breakdown": {
-                        "total_deals": stats.total_deals,
-                    },
-                    "price_statistics": stats.price_statistics,
-                    "area_statistics": stats.area_statistics,
-                    "price_per_sqm_statistics": stats.price_per_sqm_statistics,
-                    "property_type_distribution": stats.property_type_distribution,
-                    "date_range": stats.date_range,
-                },
-                "deals": [],  # Statistics-only query, no full deals returned
-            },
-            ensure_ascii=False,
-            indent=2,
+        stats = client.calculate_deal_statistics(
+            deals, iqr_multiplier=iqr_multiplier, include_outlier_deals=include_outlier_deals
         )
+
+        # Build response
+        response_data = {
+            "search_parameters": {
+                "address": address,
+                "years_back": years_back,
+                "filters_applied": {
+                    "property_type": property_type,
+                    "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
+                },
+            },
+            "market_statistics": {
+                "deal_breakdown": {
+                    "total_deals": stats.total_deals,
+                },
+                "price_statistics": stats.price_statistics,
+                "area_statistics": stats.area_statistics,
+                "price_per_sqm_statistics": stats.price_per_sqm_statistics,
+                "property_type_distribution": stats.property_type_distribution,
+                "date_range": stats.date_range,
+            },
+            "deals": [],  # Statistics-only query, no full deals returned
+        }
+
+        # Add outlier deals if present and requested
+        if include_outlier_deals and stats.outlier_report and stats.outlier_report.outlier_deals:
+            response_data["outlier_deals"] = strip_bloat_fields(stats.outlier_report.outlier_deals)
+
+        return json.dumps(response_data, ensure_ascii=False, indent=2)
 
     except Exception as e:
         logger.error(f"Error in get_deal_statistics: {e}", exc_info=True)

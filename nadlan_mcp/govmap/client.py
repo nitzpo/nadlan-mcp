@@ -874,7 +874,10 @@ class GovmapClient:
 
     # Statistics methods (delegate to statistics module)
     def calculate_deal_statistics(
-        self, deals: List[Deal], iqr_multiplier: Optional[float] = None
+        self,
+        deals: List[Deal],
+        iqr_multiplier: Optional[float] = None,
+        include_outlier_deals: bool = True,
     ) -> DealStatistics:
         """
         Calculate statistical aggregations on deal data.
@@ -884,11 +887,14 @@ class GovmapClient:
         Args:
             deals: List of Deal model instances
             iqr_multiplier: Override IQR multiplier for outlier detection (optional)
+            include_outlier_deals: If True (default), include removed outliers in report
 
         Returns:
             DealStatistics model with comprehensive metrics
         """
-        return statistics.calculate_deal_statistics(deals, iqr_multiplier=iqr_multiplier)
+        return statistics.calculate_deal_statistics(
+            deals, iqr_multiplier=iqr_multiplier, include_outlier_deals=include_outlier_deals
+        )
 
     def _calculate_std_dev(self, values: List[float]) -> float:
         """
