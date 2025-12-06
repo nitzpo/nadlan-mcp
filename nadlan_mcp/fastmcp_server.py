@@ -122,7 +122,7 @@ def autocomplete_address(search_text: str) -> str:
         return json.dumps(formatted_results, ensure_ascii=False, indent=2)
 
     except Exception as e:
-        logger.error(f"Error in autocomplete_address: {e}")
+        logger.error(f"Error in autocomplete_address: {e}", exc_info=True)
         return f"Error searching for address: {str(e)}"
 
 
@@ -164,7 +164,7 @@ def get_deals_by_radius(latitude: float, longitude: float, radius_meters: int = 
         )
 
     except Exception as e:
-        logger.error(f"Error in get_deals_by_radius: {e}")
+        logger.error(f"Error in get_deals_by_radius: {e}", exc_info=True)
         return f"Error fetching polygons by radius: {str(e)}"
 
 
@@ -221,7 +221,7 @@ def get_street_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> s
         )
 
     except Exception as e:
-        logger.error(f"Error in get_street_deals: {e}")
+        logger.error(f"Error in get_street_deals: {e}", exc_info=True)
         return f"Error fetching street deals: {str(e)}"
 
 
@@ -343,7 +343,7 @@ def find_recent_deals_for_address(
         )
 
     except Exception as e:
-        logger.error(f"Error in find_recent_deals_for_address: {e}")
+        logger.error(f"Error in find_recent_deals_for_address: {e}", exc_info=True)
         return f"Error analyzing address: {str(e)}"
 
 
@@ -400,7 +400,7 @@ def get_neighborhood_deals(polygon_id: str, limit: int = 100, deal_type: int = 2
         )
 
     except Exception as e:
-        logger.error(f"Error in get_neighborhood_deals: {e}")
+        logger.error(f"Error in get_neighborhood_deals: {e}", exc_info=True)
         return f"Error fetching neighborhood deals: {str(e)}"
 
 
@@ -620,7 +620,7 @@ def analyze_market_trends(
         )
 
     except Exception as e:
-        logger.error(f"Error in analyze_market_trends: {e}")
+        logger.error(f"Error in analyze_market_trends: {e}", exc_info=True)
         return f"Error analyzing market trends: {str(e)}"
 
 
@@ -753,7 +753,7 @@ def compare_addresses(addresses: List[str]) -> str:
         )
 
     except Exception as e:
-        logger.error(f"Error in compare_addresses: {e}")
+        logger.error(f"Error in compare_addresses: {e}", exc_info=True)
         return f"Error comparing addresses: {str(e)}"
 
 
@@ -941,7 +941,7 @@ def get_valuation_comparables(
         )
 
     except Exception as e:
-        logger.error(f"Error in get_valuation_comparables: {e}")
+        logger.error(f"Error in get_valuation_comparables: {e}", exc_info=True)
         return f"Error getting valuation comparables: {str(e)}"
 
 
@@ -1037,7 +1037,7 @@ def get_deal_statistics(
         )
 
     except Exception as e:
-        logger.error(f"Error in get_deal_statistics: {e}")
+        logger.error(f"Error in get_deal_statistics: {e}", exc_info=True)
         return f"Error calculating deal statistics: {str(e)}"
 
 
@@ -1154,7 +1154,7 @@ def get_market_activity_metrics(address: str, years_back: int = 2, radius_meters
         )
 
     except Exception as e:
-        logger.error(f"Error in get_market_activity_metrics: {e}")
+        logger.error(f"Error in get_market_activity_metrics: {e}", exc_info=True)
         return f"Error analyzing market activity: {str(e)}"
 
 

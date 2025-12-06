@@ -329,3 +329,44 @@ class TestIntegration:
         # The data error should be filtered by hard bounds (price_per_sqm > 100K)
         assert len(filtered) == 12
         assert report["outliers_removed"] == 1
+
+    def test_edge_case_few_deals_with_hard_bounds_filter(self):
+        """
+        Test edge case: Small dataset where hard bounds filter removes some deals.
+
+        This reproduces the bug where list index goes out of range when:
+        - Initial dataset is small (e.g., 21 deals)
+        - Hard bounds filter removes some deals (e.g., 8 outliers)
+        - Remaining dataset is processed with IQR
+
+        The bug was in line 257 where enumerate() was missing, causing
+        the value_indices to be misaligned with the statistical_outliers list.
+        """
+        # Create 21 deals with some extreme outliers
+        deals = []
+
+        # 13 normal deals (around 10K per sqm)
+        for i in range(13):
+            deals.append(
+                Deal(objectid=i, deal_amount=1000000, deal_date=date(2023, 1, 1), asset_area=100)
+            )
+
+        # 8 extreme outliers that will be caught by hard bounds (price_per_sqm > 100K)
+        for i in range(13, 21):
+            deals.append(
+                Deal(objectid=i, deal_amount=200000000, deal_date=date(2023, 1, 1), asset_area=100)
+            )
+
+        config = GovmapConfig(
+            analysis_outlier_method="iqr",
+            analysis_iqr_multiplier=1.0,
+            analysis_price_per_sqm_max=100000,
+        )
+
+        # This should not raise IndexError
+        filtered, report = filter_deals_for_analysis(deals, config, metric="price_per_sqm")
+
+        # Hard bounds should filter the 8 extreme outliers
+        assert len(filtered) == 13
+        assert report["outliers_removed"] == 8
+        assert report["method_used"] == "iqr"

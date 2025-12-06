@@ -253,7 +253,7 @@ def filter_deals_for_analysis(
         if metric == "price_per_sqm":
             values = [
                 deal.price_per_sqm
-                for deal in deals
+                for i, deal in enumerate(deals)
                 if deal.price_per_sqm is not None and not filters_to_remove[i]
             ]
             value_indices = [
