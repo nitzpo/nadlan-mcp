@@ -29,6 +29,28 @@ mcp = FastMCP("nadlan-mcp")
 client = GovmapClient()
 
 
+def conditional_tool(config_flag: str):
+    """
+    Decorator to conditionally register MCP tools based on config.
+
+    If the config flag is False, the tool won't be registered with FastMCP.
+    """
+
+    def decorator(func):
+        config = get_config()
+        enabled = getattr(config, config_flag, True)
+
+        if enabled:
+            # Register the tool with FastMCP
+            return mcp.tool()(func)
+        else:
+            # Don't register, just return the function unchanged
+            logger.info(f"Tool {func.__name__} is DISABLED (config: {config_flag})")
+            return func
+
+    return decorator
+
+
 def log_mcp_call(func_name: str, **params):
     """
     Log MCP tool function calls with their parameters for debugging and monitoring.
@@ -83,7 +105,7 @@ def strip_bloat_fields(deals: List[Deal]) -> List[Dict[str, Any]]:
     return result
 
 
-@mcp.tool()
+@conditional_tool("tool_autocomplete_address_enabled")
 def autocomplete_address(search_text: str) -> str:
     """Search and autocomplete Israeli addresses.
 
@@ -126,7 +148,7 @@ def autocomplete_address(search_text: str) -> str:
         return f"Error searching for address: {str(e)}"
 
 
-@mcp.tool()
+@conditional_tool("tool_get_deals_by_radius_enabled")
 def get_deals_by_radius(latitude: float, longitude: float, radius_meters: int = 500) -> str:
     """Get polygon metadata within a radius of coordinates.
 
@@ -141,9 +163,6 @@ def get_deals_by_radius(latitude: float, longitude: float, radius_meters: int = 
     Returns:
         JSON string containing polygon metadata (areas with deals nearby)
     """
-    if not get_config().tool_get_deals_by_radius_enabled:
-        return "This tool is currently disabled"
-
     log_mcp_call(
         "get_deals_by_radius", latitude=latitude, longitude=longitude, radius_meters=radius_meters
     )
@@ -171,7 +190,7 @@ def get_deals_by_radius(latitude: float, longitude: float, radius_meters: int = 
         return f"Error fetching polygons by radius: {str(e)}"
 
 
-@mcp.tool()
+@conditional_tool("tool_get_street_deals_enabled")
 def get_street_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> str:
     """Get real estate deals for a specific street polygon.
 
@@ -183,9 +202,6 @@ def get_street_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> s
     Returns:
         JSON string containing recent real estate deals for the street
     """
-    if not get_config().tool_get_street_deals_enabled:
-        return "This tool is currently disabled"
-
     log_mcp_call("get_street_deals", polygon_id=polygon_id, limit=limit, deal_type=deal_type)
     try:
         deals = client.get_street_deals(polygon_id, limit, deal_type=deal_type)
@@ -231,7 +247,7 @@ def get_street_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> s
         return f"Error fetching street deals: {str(e)}"
 
 
-@mcp.tool()
+@conditional_tool("tool_find_recent_deals_for_address_enabled")
 def find_recent_deals_for_address(
     address: str,
     years_back: int = 2,
@@ -353,7 +369,7 @@ def find_recent_deals_for_address(
         return f"Error analyzing address: {str(e)}"
 
 
-@mcp.tool()
+@conditional_tool("tool_get_neighborhood_deals_enabled")
 def get_neighborhood_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> str:
     """Get real estate deals for a specific neighborhood polygon.
 
@@ -410,7 +426,7 @@ def get_neighborhood_deals(polygon_id: str, limit: int = 100, deal_type: int = 2
         return f"Error fetching neighborhood deals: {str(e)}"
 
 
-@mcp.tool()
+@conditional_tool("tool_analyze_market_trends_enabled")
 def analyze_market_trends(
     address: str,
     years_back: int = 3,
@@ -632,7 +648,7 @@ def analyze_market_trends(
         return f"Error analyzing market trends: {str(e)}"
 
 
-@mcp.tool()
+@conditional_tool("tool_compare_addresses_enabled")
 def compare_addresses(addresses: List[str]) -> str:
     """Compare real estate markets between multiple addresses.
 
@@ -767,7 +783,7 @@ def compare_addresses(addresses: List[str]) -> str:
         return f"Error comparing addresses: {str(e)}"
 
 
-@mcp.tool()
+@conditional_tool("tool_get_valuation_comparables_enabled")
 def get_valuation_comparables(
     address: str,
     years_back: int = 2,
@@ -955,7 +971,7 @@ def get_valuation_comparables(
         return f"Error getting valuation comparables: {str(e)}"
 
 
-@mcp.tool()
+@conditional_tool("tool_get_deal_statistics_enabled")
 def get_deal_statistics(
     address: str,
     years_back: int = 2,
@@ -1077,7 +1093,7 @@ def _safe_calculate_metric(metric_func, deals):
         return {"error": str(e)}
 
 
-@mcp.tool()
+@conditional_tool("tool_get_market_activity_metrics_enabled")
 def get_market_activity_metrics(address: str, years_back: int = 2, radius_meters: int = 100) -> str:
     """Get comprehensive market activity and investment potential analysis.
 
@@ -1097,9 +1113,6 @@ def get_market_activity_metrics(address: str, years_back: int = 2, radius_meters
             - Investment potential analysis
             - Price appreciation and volatility
     """
-    if not get_config().tool_get_market_activity_metrics_enabled:
-        return "This tool is currently disabled"
-
     log_mcp_call(
         "get_market_activity_metrics",
         address=address,
