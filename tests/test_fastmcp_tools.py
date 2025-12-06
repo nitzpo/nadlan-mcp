@@ -10,7 +10,10 @@ Updated for Phase 4.1 - Pydantic models integration.
 import json
 from unittest.mock import patch
 
+import pytest
+
 from nadlan_mcp import fastmcp_server
+from nadlan_mcp.config import get_config
 from nadlan_mcp.govmap.models import (
     AutocompleteResponse,
     AutocompleteResult,
@@ -127,6 +130,10 @@ class TestAutocompleteAddress:
         assert "API Error" in result
 
 
+@pytest.mark.skipif(
+    not get_config().tool_get_deals_by_radius_enabled,
+    reason="get_deals_by_radius tool is disabled",
+)
 class TestGetDealsByRadius:
     """Test get_deals_by_radius MCP tool."""
 
@@ -433,6 +440,10 @@ class TestGetDealStatistics:
         assert parsed["market_statistics"]["deal_breakdown"]["total_deals"] == 2
 
 
+@pytest.mark.skipif(
+    not get_config().tool_get_market_activity_metrics_enabled,
+    reason="get_market_activity_metrics tool is disabled",
+)
 class TestGetMarketActivityMetrics:
     """Test get_market_activity_metrics MCP tool."""
 
@@ -464,6 +475,9 @@ class TestGetMarketActivityMetrics:
         assert "investment_potential" in parsed
 
 
+@pytest.mark.skipif(
+    not get_config().tool_get_street_deals_enabled, reason="get_street_deals tool is disabled"
+)
 class TestGetStreetDeals:
     """Test get_street_deals MCP tool."""
 

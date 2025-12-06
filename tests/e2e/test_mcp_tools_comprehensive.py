@@ -11,6 +11,7 @@ import json
 
 import pytest
 
+from nadlan_mcp.config import get_config
 from nadlan_mcp.fastmcp_server import (
     analyze_market_trends,
     autocomplete_address,
@@ -132,6 +133,9 @@ class TestMCPToolsE2E:
 
     def test_get_market_activity_metrics(self):
         """Test market activity metrics."""
+
+        if not get_config().tool_get_market_activity_metrics_enabled:
+            pytest.skip("test_get_market_activity tool is disabled")
         result = get_market_activity_metrics(self.TEST_ADDRESS_1, years_back=3)
         data = json.loads(result)
 
@@ -151,6 +155,9 @@ class TestMCPToolsE2E:
 
     def test_get_street_deals(self):
         """Test getting street-level deals."""
+
+        if not get_config().tool_get_street_deals_enabled:
+            pytest.skip("test_get_street_deals tool is disabled")
         result = get_street_deals(self.TEST_POLYGON_ID, limit=100, deal_type=2)
         data = json.loads(result)
 
@@ -180,6 +187,9 @@ class TestMCPToolsE2E:
 
     def test_get_deals_by_radius(self):
         """Test getting polygon metadata by radius."""
+
+        if not get_config().tool_get_deals_by_radius_enabled:
+            pytest.skip("test_get_deals_by_radius tool is disabled")
         result = get_deals_by_radius(self.TEST_LAT, self.TEST_LON, radius_meters=500)
         data = json.loads(result)
 
@@ -196,6 +206,9 @@ class TestMCPToolsE2E:
 
     def test_get_deals_by_radius_no_results(self):
         """Test get_deals_by_radius with coords that have no data."""
+        if not get_config().tool_get_deals_by_radius_enabled:
+            pytest.skip("test_get_deals_by_radius tool is disabled")
+
         # Use coordinates unlikely to have data
         result = get_deals_by_radius(37.66, 38.71, radius_meters=10)
 

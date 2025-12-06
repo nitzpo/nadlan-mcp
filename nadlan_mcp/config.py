@@ -117,6 +117,52 @@ class GovmapConfig:
         default_factory=lambda: os.getenv("GOVMAP_USER_AGENT", "NadlanMCP/1.0.0")
     )
 
+    # MCP Tool Availability (enable/disable specific tools)
+    tool_autocomplete_address_enabled: bool = field(
+        default_factory=lambda: os.getenv("TOOL_AUTOCOMPLETE_ADDRESS_ENABLED", "true").lower()
+        == "true"
+    )
+    tool_get_deals_by_radius_enabled: bool = field(
+        default_factory=lambda: os.getenv("TOOL_GET_DEALS_BY_RADIUS_ENABLED", "false").lower()
+        == "true"
+    )
+    tool_get_street_deals_enabled: bool = field(
+        default_factory=lambda: os.getenv("TOOL_GET_STREET_DEALS_ENABLED", "false").lower()
+        == "true"
+    )
+    tool_get_neighborhood_deals_enabled: bool = field(
+        default_factory=lambda: os.getenv("TOOL_GET_NEIGHBORHOOD_DEALS_ENABLED", "true").lower()
+        == "true"
+    )
+    tool_find_recent_deals_for_address_enabled: bool = field(
+        default_factory=lambda: os.getenv(
+            "TOOL_FIND_RECENT_DEALS_FOR_ADDRESS_ENABLED", "true"
+        ).lower()
+        == "true"
+    )
+    tool_analyze_market_trends_enabled: bool = field(
+        default_factory=lambda: os.getenv("TOOL_ANALYZE_MARKET_TRENDS_ENABLED", "true").lower()
+        == "true"
+    )
+    tool_compare_addresses_enabled: bool = field(
+        default_factory=lambda: os.getenv("TOOL_COMPARE_ADDRESSES_ENABLED", "true").lower()
+        == "true"
+    )
+    tool_get_valuation_comparables_enabled: bool = field(
+        default_factory=lambda: os.getenv("TOOL_GET_VALUATION_COMPARABLES_ENABLED", "true").lower()
+        == "true"
+    )
+    tool_get_deal_statistics_enabled: bool = field(
+        default_factory=lambda: os.getenv("TOOL_GET_DEAL_STATISTICS_ENABLED", "true").lower()
+        == "true"
+    )
+    tool_get_market_activity_metrics_enabled: bool = field(
+        default_factory=lambda: os.getenv(
+            "TOOL_GET_MARKET_ACTIVITY_METRICS_ENABLED", "false"
+        ).lower()
+        == "true"
+    )
+
     def __post_init__(self):
         """Validate configuration after initialization."""
         self._validate()

@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
+from nadlan_mcp.config import get_config
 from nadlan_mcp.fastmcp_server import (
     autocomplete_address,
     get_deals_by_radius,
@@ -78,6 +79,9 @@ class TestMCPToolsFast:
     @patch("nadlan_mcp.fastmcp_server.client")
     def test_get_street_deals_fast(self, mock_client, mock_street_deals_data):
         """Test street deals with cached data."""
+        if not get_config().tool_get_street_deals_enabled:
+            pytest.skip("get_street_deals tool is disabled")
+
         mock_client.get_street_deals.return_value = mock_street_deals_data
 
         result = get_street_deals("52385050", limit=100, deal_type=2)
@@ -108,6 +112,9 @@ class TestMCPToolsFast:
     @patch("nadlan_mcp.fastmcp_server.client")
     def test_get_deals_by_radius_fast(self, mock_client, mock_polygon_metadata_data):
         """Test deals by radius with cached data."""
+
+        if not get_config().tool_get_deals_by_radius_enabled:
+            pytest.skip("test_get_deals_by_radius tool is disabled")
         mock_client.get_deals_by_radius.return_value = mock_polygon_metadata_data
 
         result = get_deals_by_radius(37.6629, 38.7093, radius_meters=500)
@@ -138,6 +145,9 @@ class TestMCPToolsFast:
     @patch("nadlan_mcp.fastmcp_server.client")
     def test_no_deals_found(self, mock_client):
         """Test handling when no deals are found."""
+        if not get_config().tool_get_street_deals_enabled:
+            pytest.skip("get_street_deals tool is disabled")
+
         mock_client.get_street_deals.return_value = []
 
         result = get_street_deals("999999", limit=100, deal_type=2)
@@ -149,6 +159,9 @@ class TestMCPToolsFast:
     @patch("nadlan_mcp.fastmcp_server.client")
     def test_deal_type_filtering(self, mock_client, mock_street_deals_data):
         """Test that deal_type parameter is passed correctly."""
+        if not get_config().tool_get_street_deals_enabled:
+            pytest.skip("get_street_deals tool is disabled")
+
         mock_client.get_street_deals.return_value = mock_street_deals_data
 
         # Test with deal_type=1 (first hand)

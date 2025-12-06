@@ -141,6 +141,9 @@ def get_deals_by_radius(latitude: float, longitude: float, radius_meters: int = 
     Returns:
         JSON string containing polygon metadata (areas with deals nearby)
     """
+    if not get_config().tool_get_deals_by_radius_enabled:
+        return "This tool is currently disabled"
+
     log_mcp_call(
         "get_deals_by_radius", latitude=latitude, longitude=longitude, radius_meters=radius_meters
     )
@@ -180,6 +183,9 @@ def get_street_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> s
     Returns:
         JSON string containing recent real estate deals for the street
     """
+    if not get_config().tool_get_street_deals_enabled:
+        return "This tool is currently disabled"
+
     log_mcp_call("get_street_deals", polygon_id=polygon_id, limit=limit, deal_type=deal_type)
     try:
         deals = client.get_street_deals(polygon_id, limit, deal_type=deal_type)
@@ -414,6 +420,8 @@ def analyze_market_trends(
 ) -> str:
     """Analyze market trends and price patterns for an area with comprehensive data.
 
+    **BETA**: This tool is not well tested or reliable. Use with caution.
+
     Args:
         address: The address to analyze trends around
         years_back: How many years of data to analyze (default: 3)
@@ -627,6 +635,8 @@ def analyze_market_trends(
 @mcp.tool()
 def compare_addresses(addresses: List[str]) -> str:
     """Compare real estate markets between multiple addresses.
+
+    **BETA**: This tool is not well tested or reliable. Use with caution.
 
     Args:
         addresses: List of addresses to compare (in Hebrew or English)
@@ -1087,6 +1097,9 @@ def get_market_activity_metrics(address: str, years_back: int = 2, radius_meters
             - Investment potential analysis
             - Price appreciation and volatility
     """
+    if not get_config().tool_get_market_activity_metrics_enabled:
+        return "This tool is currently disabled"
+
     log_mcp_call(
         "get_market_activity_metrics",
         address=address,

@@ -11,6 +11,7 @@ import json
 
 import pytest
 
+from nadlan_mcp.config import get_config
 from nadlan_mcp.fastmcp_server import (
     autocomplete_address,
     find_recent_deals_for_address,
@@ -40,6 +41,9 @@ class TestMCPToolsSmokeTests:
 
     def test_get_street_deals_works(self):
         """Smoke test: Can fetch street deals."""
+
+        if not get_config().tool_get_street_deals_enabled:
+            pytest.skip("test_get_street_deals tool is disabled")
         # Use small limit for speed
         result = get_street_deals(self.TEST_POLYGON_ID, limit=5, deal_type=2)
         data = json.loads(result)
@@ -50,6 +54,9 @@ class TestMCPToolsSmokeTests:
 
     def test_get_deals_by_radius_works(self):
         """Smoke test: Can fetch polygon metadata by radius."""
+
+        if not get_config().tool_get_deals_by_radius_enabled:
+            pytest.skip("test_get_deals_by_radius tool is disabled")
         # Use small radius for speed
         result = get_deals_by_radius(self.TEST_LAT, self.TEST_LON, radius_meters=100)
         data = json.loads(result)
