@@ -203,9 +203,28 @@ class TestGetDealsByRadius:
 class TestFindRecentDealsForAddress:
     """Test find_recent_deals_for_address MCP tool."""
 
+    @staticmethod
+    def _mock_autocomplete():
+        """Helper to create mock autocomplete response."""
+        return AutocompleteResponse(
+            resultsCount=1,
+            results=[
+                AutocompleteResult(
+                    id="test",
+                    text="Test Address",
+                    type="address",
+                    score=100,
+                    coordinates=CoordinatePoint(longitude=180000, latitude=665000),
+                )
+            ],
+        )
+
     @patch("nadlan_mcp.fastmcp_server.client")
     def test_successful_find_deals(self, mock_client):
         """Test successful deal finding with statistics."""
+        # Mock autocomplete
+        mock_client.autocomplete_address.return_value = self._mock_autocomplete()
+
         # Mock with Deal models
         mock_deals = [
             Deal(
@@ -248,6 +267,9 @@ class TestFindRecentDealsForAddress:
     @patch("nadlan_mcp.fastmcp_server.client")
     def test_find_deals_strips_bloat(self, mock_client):
         """Test that bloat fields are stripped."""
+        # Mock autocomplete
+        mock_client.autocomplete_address.return_value = self._mock_autocomplete()
+
         # Mock with Deal models
         mock_deals = [
             Deal(
@@ -270,9 +292,28 @@ class TestFindRecentDealsForAddress:
 class TestAnalyzeMarketTrends:
     """Test analyze_market_trends MCP tool."""
 
+    @staticmethod
+    def _mock_autocomplete():
+        """Helper to create mock autocomplete response."""
+        return AutocompleteResponse(
+            resultsCount=1,
+            results=[
+                AutocompleteResult(
+                    id="test",
+                    text="Test Address",
+                    type="address",
+                    score=100,
+                    coordinates=CoordinatePoint(longitude=180000, latitude=665000),
+                )
+            ],
+        )
+
     @patch("nadlan_mcp.fastmcp_server.client")
     def test_successful_market_analysis(self, mock_client):
         """Test successful market trend analysis."""
+        # Mock autocomplete
+        mock_client.autocomplete_address.return_value = self._mock_autocomplete()
+
         # Mock with Deal models
         mock_deals = [
             Deal(
@@ -341,9 +382,27 @@ class TestCompareAddresses:
 class TestGetValuationComparables:
     """Test get_valuation_comparables MCP tool."""
 
+    @staticmethod
+    def _mock_autocomplete():
+        """Helper to create mock autocomplete response."""
+        return AutocompleteResponse(
+            resultsCount=1,
+            results=[
+                AutocompleteResult(
+                    id="test",
+                    text="Test Address",
+                    type="address",
+                    score=100,
+                    coordinates=CoordinatePoint(longitude=180000, latitude=665000),
+                )
+            ],
+        )
+
     @patch("nadlan_mcp.fastmcp_server.client")
     def test_successful_get_comparables(self, mock_client):
         """Test successful comparable retrieval with filtering."""
+        # Mock autocomplete
+        mock_client.autocomplete_address.return_value = self._mock_autocomplete()
 
         # Mock with Deal models
         mock_deals = [
@@ -382,6 +441,8 @@ class TestGetValuationComparables:
     @patch("nadlan_mcp.fastmcp_server.client")
     def test_comparables_strips_bloat(self, mock_client):
         """Test that bloat fields are stripped from comparables."""
+        # Mock autocomplete
+        mock_client.autocomplete_address.return_value = self._mock_autocomplete()
 
         # Mock with Deal models
         mock_deals = [
@@ -412,9 +473,27 @@ class TestGetValuationComparables:
 class TestGetDealStatistics:
     """Test get_deal_statistics MCP tool."""
 
+    @staticmethod
+    def _mock_autocomplete():
+        """Helper to create mock autocomplete response."""
+        return AutocompleteResponse(
+            resultsCount=1,
+            results=[
+                AutocompleteResult(
+                    id="test",
+                    text="Test Address",
+                    type="address",
+                    score=100,
+                    coordinates=CoordinatePoint(longitude=180000, latitude=665000),
+                )
+            ],
+        )
+
     @patch("nadlan_mcp.fastmcp_server.client")
     def test_successful_statistics_calculation(self, mock_client):
         """Test successful statistics calculation."""
+        # Mock autocomplete
+        mock_client.autocomplete_address.return_value = self._mock_autocomplete()
 
         # Mock with Deal models
         mock_deals = [

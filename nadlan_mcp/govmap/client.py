@@ -518,7 +518,7 @@ class GovmapClient:
         self,
         address: str,
         years_back: int = 2,
-        radius: int = 30,
+        radius: int = 50,
         max_deals: int = 100,
         deal_type: int = 2,
     ) -> List[Deal]:
@@ -531,14 +531,15 @@ class GovmapClient:
         Args:
             address: The address to search for
             years_back: How many years back to search (default: 2)
-            radius: Search radius in meters for initial coordinate search (default: 30)
-                   Small radius since street deals cover the entire street anyway
+            radius: Search radius in meters (default: 50). Deals beyond this radius are filtered out,
+                   EXCEPT same-building deals which are always included regardless of distance.
             max_deals: Maximum number of deals to return (default: 100)
             deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
 
         Returns:
-            List of Deal models found for the address area, with same building deals prioritized first,
-            then street deals, then neighborhood deals
+            List of Deal models found within radius meters of the address, with same building deals
+            prioritized first, then street deals, then neighborhood deals. Same-building deals are
+            included regardless of distance.
 
         Raises:
             ValueError: If address cannot be found or processed, or input is invalid
@@ -722,8 +723,12 @@ class GovmapClient:
                             seen_deals.add(deal_id)
 
                             # Calculate distance from search point to deal
-                            # Most deals don't have individual coordinates, so use polygon distance
-                            deal_distance = polygon_distance
+                            # Try to extract centroid from shape, fall back to polygon distance
+                            deal_centroid = utils.extract_shape_centroid(deal.shape)
+                            if deal_centroid:
+                                deal_distance = utils.calculate_distance(point, deal_centroid)
+                            else:
+                                deal_distance = polygon_distance
 
                             # Store metadata using dynamic attributes (allowed by extra='allow')
                             deal.source_polygon_id = polygon_id
@@ -765,8 +770,13 @@ class GovmapClient:
                         if deal_id not in seen_deals:
                             seen_deals.add(deal_id)
 
-                            # Calculate distance from search point (use polygon distance)
-                            deal_distance = polygon_distance
+                            # Calculate distance from search point to deal
+                            # Try to extract centroid from shape, fall back to polygon distance
+                            deal_centroid = utils.extract_shape_centroid(deal.shape)
+                            if deal_centroid:
+                                deal_distance = utils.calculate_distance(point, deal_centroid)
+                            else:
+                                deal_distance = polygon_distance
 
                             # Apply distance filter for neighborhood deals
                             if deal_distance <= self.config.max_neighborhood_deal_distance_meters:
@@ -788,6 +798,24 @@ class GovmapClient:
 
             # Step 5: Combine and prioritize: building deals first, then street, then neighborhood
             all_deals = building_deals + street_deals + neighborhood_deals
+
+            # Filter by user-specified radius (deals beyond radius_meters are excluded)
+            # Same-building deals are ALWAYS included regardless of distance
+            filtered_deals = []
+            for deal in all_deals:
+                deal_distance = getattr(deal, "distance_meters", 0)
+                is_same_building = getattr(deal, "deal_source", None) == "same_building"
+
+                if is_same_building or deal_distance <= radius:
+                    filtered_deals.append(deal)
+                else:
+                    logger.debug(f"Filtered deal at {deal_distance:.0f}m (radius limit: {radius}m)")
+
+            all_deals = filtered_deals
+            logger.info(
+                f"After radius filtering ({radius}m): {len(all_deals)} deals "
+                f"(removed {len(building_deals) + len(street_deals) + len(neighborhood_deals) - len(all_deals)} deals)"
+            )
 
             # Multi-level sort with stable sorting:
             # 1. Date (newest first) - applied first to maintain recency within same priority/distance

@@ -74,32 +74,73 @@ def log_mcp_call(func_name: str, **params):
     )
 
 
-def strip_bloat_fields(deals: List[Deal]) -> List[Dict[str, Any]]:
+def strip_bloat_fields(deals: List[Deal], lang: str = "he") -> List[Dict[str, Any]]:
     """
     Remove bloat fields from Deal models to reduce token usage in MCP responses.
 
-    Converts Deal models to dictionaries and removes:
-    - shape: Large MULTIPOLYGON coordinate data (~40-50% of tokens, not useful for LLM analysis)
-    - sourceorder: Internal ordering field
-    - source_polygon_id: Internal reference field (only when it's a UUID string)
+    Converts Deal models to dictionaries and removes unnecessary fields:
+    - shape: Large MULTIPOLYGON coordinate data
+    - sourceorder, objectid, priority: Internal fields
+    - source_polygon_id, settlementId, streetCode, dealId, polygonId: Internal IDs
+    - deal_type_description: Redundant (kept in search_parameters only)
+
+    Adds sequential ID for LLM reference and selects language for text fields.
 
     Args:
         deals: List of Deal model instances
+        lang: Language for text values ("he" for Hebrew, "en" for English)
 
     Returns:
-        List of deal dictionaries with bloat fields removed
+        List of deal dictionaries with bloat removed and sequential IDs
     """
-    bloat_fields = {"shape", "sourceorder"}
-    # Note: We keep source_polygon_id if it was added by our processing logic
+    bloat_fields = {
+        "shape",
+        "sourceorder",
+        "objectid",
+        "priority",
+        "source_polygon_id",
+        "settlementId",
+        "streetCode",
+        "dealId",
+        "polygonId",
+        "deal_type_description",
+    }
 
     result = []
-    for deal in deals:
-        # Convert Deal model to dict, excluding None values for cleaner output
-        # Use mode='json' to serialize dates as ISO strings
+    for idx, deal in enumerate(deals, start=1):
+        # Convert Deal model to dict, excluding None values
         deal_dict = deal.model_dump(mode="json", exclude_none=True)
 
         # Remove bloat fields
         filtered_dict = {k: v for k, v in deal_dict.items() if k not in bloat_fields}
+
+        # Add sequential ID for LLM reference
+        filtered_dict["id"] = idx
+
+        # Select language for text fields (Hebrew or English)
+        if lang == "en":
+            # Use English values if available
+            if "settlementNameEng" in filtered_dict:
+                filtered_dict["settlement_name"] = filtered_dict.pop("settlementNameEng")
+                filtered_dict.pop("settlementNameHeb", None)
+            if "streetNameEng" in filtered_dict:
+                filtered_dict["street_name"] = filtered_dict.pop("streetNameEng")
+                filtered_dict.pop("streetNameHeb", None)
+            if "assetTypeEng" in filtered_dict:
+                filtered_dict["asset_type"] = filtered_dict.pop("assetTypeEng")
+                filtered_dict.pop("assetTypeHeb", None)
+        else:  # Default to Hebrew
+            # Use Hebrew values
+            if "settlementNameHeb" in filtered_dict:
+                filtered_dict["settlement_name"] = filtered_dict.pop("settlementNameHeb")
+                filtered_dict.pop("settlementNameEng", None)
+            if "streetNameHeb" in filtered_dict:
+                filtered_dict["street_name"] = filtered_dict.pop("streetNameHeb")
+                filtered_dict.pop("streetNameEng", None)
+            if "assetTypeHeb" in filtered_dict:
+                filtered_dict["asset_type"] = filtered_dict.pop("assetTypeHeb")
+                filtered_dict.pop("assetTypeEng", None)
+
         result.append(filtered_dict)
 
     return result
@@ -141,7 +182,7 @@ def autocomplete_address(search_text: str) -> str:
 
             formatted_results.append(result_dict)
 
-        return json.dumps(formatted_results, ensure_ascii=False, indent=2)
+        return json.dumps(formatted_results, ensure_ascii=False, indent=None)
 
     except Exception as e:
         logger.error(f"Error in autocomplete_address: {e}", exc_info=True)
@@ -182,7 +223,7 @@ def get_deals_by_radius(latitude: float, longitude: float, radius_meters: int = 
                 "polygons": polygons,  # Return dicts directly, no stripping needed
             },
             ensure_ascii=False,
-            indent=2,
+            indent=None,
         )
 
     except Exception as e:
@@ -236,10 +277,10 @@ def get_street_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> s
                 "deal_type": deal_type,
                 "deal_type_description": deal_type_desc,
                 "market_statistics": stats,
-                "deals": strip_bloat_fields(deals),
+                "deals": strip_bloat_fields(deals, lang="he"),
             },
             ensure_ascii=False,
-            indent=2,
+            indent=None,
         )
 
     except Exception as e:
@@ -251,22 +292,25 @@ def get_street_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> s
 def find_recent_deals_for_address(
     address: str,
     years_back: int = 2,
-    radius_meters: int = 30,
+    radius_meters: int = 50,
     max_deals: int = 100,
     deal_type: int = 2,
+    lang: str = "he",
 ) -> str:
     """Find recent real estate deals for a specific address.
 
     Args:
         address: The address to search for (in Hebrew or English)
         years_back: How many years back to search (default: 2)
-        radius_meters: Search radius in meters from the address (default: 30)
-                      Small radius since street deals cover the entire street anyway
+        radius_meters: Search radius in meters from the address (default: 50)
+                      Deals beyond this radius are filtered out, EXCEPT same-building deals
+                      which are always included regardless of distance.
         max_deals: Maximum number of deals to return (default: 100, provides good context for LLM analysis)
         deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
+        lang: Language for text values ("he" for Hebrew [default], "en" for English)
 
     Returns:
-        JSON string containing recent real estate deals for the address
+        JSON string containing recent real estate deals within radius_meters of the address
     """
     log_mcp_call(
         "find_recent_deals_for_address",
@@ -277,6 +321,14 @@ def find_recent_deals_for_address(
         deal_type=deal_type,
     )
     try:
+        # Get coordinates for search center
+        autocomplete_result = client.autocomplete_address(address)
+        search_coords = None
+        if autocomplete_result.results:
+            coords = autocomplete_result.results[0].coordinates
+            if coords:
+                search_coords = {"longitude": coords.longitude, "latitude": coords.latitude}
+
         deals = client.find_recent_deals_for_address(
             address, years_back, radius_meters, max_deals, deal_type
         )
@@ -347,21 +399,25 @@ def find_recent_deals_for_address(
             }
 
         deal_type_desc = "first hand (new)" if deal_type == 1 else "second hand (used)"
+        search_params = {
+            "address": address,
+            "years_back": years_back,
+            "radius_meters": radius_meters,
+            "max_deals": max_deals,
+            "deal_type": deal_type,
+            "deal_type_description": deal_type_desc,
+        }
+        if search_coords:
+            search_params["search_coordinates"] = search_coords
+
         return json.dumps(
             {
-                "search_parameters": {
-                    "address": address,
-                    "years_back": years_back,
-                    "radius_meters": radius_meters,
-                    "max_deals": max_deals,
-                    "deal_type": deal_type,
-                    "deal_type_description": deal_type_desc,
-                },
+                "search_parameters": search_params,
                 "market_statistics": stats,
-                "deals": strip_bloat_fields(deals),
+                "deals": strip_bloat_fields(deals, lang=lang),
             },
             ensure_ascii=False,
-            indent=2,
+            indent=None,
         )
 
     except Exception as e:
@@ -370,13 +426,16 @@ def find_recent_deals_for_address(
 
 
 @conditional_tool("tool_get_neighborhood_deals_enabled")
-def get_neighborhood_deals(polygon_id: str, limit: int = 100, deal_type: int = 2) -> str:
+def get_neighborhood_deals(
+    polygon_id: str, limit: int = 100, deal_type: int = 2, lang: str = "he"
+) -> str:
     """Get real estate deals for a specific neighborhood polygon.
 
     Args:
         polygon_id: The polygon ID of the neighborhood
         limit: Maximum number of deals to return (default: 100)
         deal_type: Deal type filter (1=first hand/new, 2=second hand/used, default: 2)
+        lang: Language for text values ("he" for Hebrew [default], "en" for English)
 
     Returns:
         JSON string containing recent real estate deals in the specified neighborhood
@@ -415,10 +474,10 @@ def get_neighborhood_deals(polygon_id: str, limit: int = 100, deal_type: int = 2
                 "deal_type": deal_type,
                 "deal_type_description": deal_type_desc,
                 "market_statistics": stats,
-                "deals": strip_bloat_fields(deals),
+                "deals": strip_bloat_fields(deals, lang=lang),
             },
             ensure_ascii=False,
-            indent=2,
+            indent=None,
         )
 
     except Exception as e:
@@ -457,6 +516,14 @@ def analyze_market_trends(
         deal_type=deal_type,
     )
     try:
+        # Get coordinates for search center
+        autocomplete_result = client.autocomplete_address(address)
+        search_coords = None
+        if autocomplete_result.results:
+            coords = autocomplete_result.results[0].coordinates
+            if coords:
+                search_coords = {"longitude": coords.longitude, "latitude": coords.latitude}
+
         # Get deals for the address with larger radius for trend analysis
         deals = client.find_recent_deals_for_address(
             address, years_back, radius_meters, max_deals, deal_type
@@ -600,16 +667,20 @@ def analyze_market_trends(
 
         # Return summarized analysis (NO raw deals to save tokens)
         # Normalize structure with standard market_statistics while keeping tool-specific analysis
+        analysis_params = {
+            "address": address,
+            "years_analyzed": years_back,
+            "radius_meters": radius_meters,
+            "deals_analyzed": len(deals),
+            "deal_type": deal_type,
+            "deal_type_description": deal_type_desc,
+        }
+        if search_coords:
+            analysis_params["search_coordinates"] = search_coords
+
         return json.dumps(
             {
-                "analysis_parameters": {
-                    "address": address,
-                    "years_analyzed": years_back,
-                    "radius_meters": radius_meters,
-                    "deals_analyzed": len(deals),
-                    "deal_type": deal_type,
-                    "deal_type_description": deal_type_desc,
-                },
+                "analysis_parameters": analysis_params,
                 "market_statistics": {
                     "deal_breakdown": {
                         "total_deals": len(deals),
@@ -640,7 +711,7 @@ def analyze_market_trends(
                 "deals": [],  # Trend analysis doesn't return raw deals to save tokens
             },
             ensure_ascii=False,
-            indent=2,
+            indent=None,
         )
 
     except Exception as e:
@@ -666,6 +737,20 @@ def compare_addresses(addresses: List[str]) -> str:
 
         for address in addresses:
             try:
+                # Get coordinates for this address
+                search_coords = None
+                try:
+                    autocomplete_result = client.autocomplete_address(address)
+                    if autocomplete_result.results:
+                        coords = autocomplete_result.results[0].coordinates
+                        if coords:
+                            search_coords = {
+                                "longitude": coords.longitude,
+                                "latitude": coords.latitude,
+                            }
+                except Exception:
+                    pass  # Continue without coordinates if autocomplete fails
+
                 deals = client.find_recent_deals_for_address(address, 2)
 
                 if deals:
@@ -690,6 +775,7 @@ def compare_addresses(addresses: List[str]) -> str:
 
                     comparison = {
                         "address": address,
+                        "search_coordinates": search_coords,
                         "total_deals": len(deals),
                         "same_building_deals": len(building_deals),
                         "street_deals": len(street_deals),
@@ -731,6 +817,7 @@ def compare_addresses(addresses: List[str]) -> str:
                 else:
                     comparison = {
                         "address": address,
+                        "search_coordinates": search_coords,
                         "total_deals": 0,
                         "same_building_deals": 0,
                         "street_deals": 0,
@@ -775,7 +862,7 @@ def compare_addresses(addresses: List[str]) -> str:
                 "all_results": comparisons,
             },
             ensure_ascii=False,
-            indent=2,
+            indent=None,
         )
 
     except Exception as e:
@@ -800,6 +887,7 @@ def get_valuation_comparables(
     max_comparables: int = 50,
     iqr_multiplier: Optional[float] = None,
     include_outlier_deals: bool = True,
+    lang: str = "he",
 ) -> str:
     """Get comparable properties for valuation analysis.
 
@@ -825,6 +913,7 @@ def get_valuation_comparables(
         iqr_multiplier: Override IQR multiplier for outlier detection (default: 1.0). Lower = more aggressive filtering
         include_outlier_deals: If True (default), include the outlier deals separately in the response
                               This allows you to see what was filtered out and answer questions about it
+        lang: Language for text values ("he" for Hebrew [default], "en" for English)
 
     Returns:
         JSON string containing:
@@ -855,20 +944,32 @@ def get_valuation_comparables(
         iqr_multiplier=iqr_multiplier,
     )
     try:
+        # Get coordinates for search center
+        autocomplete_result = client.autocomplete_address(address)
+        search_coords = None
+        if autocomplete_result.results:
+            coords = autocomplete_result.results[0].coordinates
+            if coords:
+                search_coords = {"longitude": coords.longitude, "latitude": coords.latitude}
+
         # Get all deals for the address with higher limits for valuation
         deals = client.find_recent_deals_for_address(
             address, years_back, radius=radius_meters, max_deals=max_comparables
         )
 
+        search_params_base = {
+            "address": address,
+            "years_back": years_back,
+            "radius_meters": radius_meters,
+            "max_comparables": max_comparables,
+        }
+        if search_coords:
+            search_params_base["search_coordinates"] = search_coords
+
         if not deals:
             return json.dumps(
                 {
-                    "search_parameters": {
-                        "address": address,
-                        "years_back": years_back,
-                        "radius_meters": radius_meters,
-                        "max_comparables": max_comparables,
-                    },
+                    "search_parameters": search_params_base,
                     "market_statistics": {
                         "deal_breakdown": {
                             "total_deals": 0,
@@ -878,7 +979,7 @@ def get_valuation_comparables(
                     "message": "No deals found for this address",
                 },
                 ensure_ascii=False,
-                indent=2,
+                indent=None,
             )
 
         # Apply filters
@@ -945,20 +1046,16 @@ def get_valuation_comparables(
                 deal_breakdown["iqr_multiplier"] = outlier_report["parameters"]["iqr_multiplier"]
 
         # Build response with filtered deals
+        search_params_base["filters_applied"] = {
+            "property_type": property_type,
+            "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
+            "price": f"{min_price}-{max_price}" if min_price or max_price else None,
+            "area": f"{min_area}-{max_area}" if min_area or max_area else None,
+            "floor": f"{min_floor}-{max_floor}" if min_floor or max_floor else None,
+        }
+
         response_data = {
-            "search_parameters": {
-                "address": address,
-                "years_back": years_back,
-                "radius_meters": radius_meters,
-                "max_comparables": max_comparables,
-                "filters_applied": {
-                    "property_type": property_type,
-                    "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
-                    "price": f"{min_price}-{max_price}" if min_price or max_price else None,
-                    "area": f"{min_area}-{max_area}" if min_area or max_area else None,
-                    "floor": f"{min_floor}-{max_floor}" if min_floor or max_floor else None,
-                },
-            },
+            "search_parameters": search_params_base,
             "market_statistics": {
                 "deal_breakdown": deal_breakdown,
                 "price_statistics": stats.price_statistics,
@@ -967,14 +1064,16 @@ def get_valuation_comparables(
                 "property_type_distribution": stats.property_type_distribution,
                 "date_range": stats.date_range,
             },
-            "deals": strip_bloat_fields(filtered_deals),
+            "deals": strip_bloat_fields(filtered_deals, lang=lang),
         }
 
         # Add outlier deals if present and requested
         if include_outlier_deals and outlier_report and "outlier_deals" in outlier_report:
-            response_data["outlier_deals"] = strip_bloat_fields(outlier_report["outlier_deals"])
+            response_data["outlier_deals"] = strip_bloat_fields(
+                outlier_report["outlier_deals"], lang=lang
+            )
 
-        return json.dumps(response_data, ensure_ascii=False, indent=2)
+        return json.dumps(response_data, ensure_ascii=False, indent=None)
 
     except Exception as e:
         logger.error(f"Error in get_valuation_comparables: {e}", exc_info=True)
@@ -989,12 +1088,11 @@ def get_deal_statistics(
     min_rooms: Optional[float] = None,
     max_rooms: Optional[float] = None,
     iqr_multiplier: Optional[float] = None,
-    include_outlier_deals: bool = True,
 ) -> str:
     """Calculate statistical aggregations on deal data for an address.
 
-    This tool provides quick statistical summaries without returning all raw deals.
-    Useful when LLM needs calculations on large datasets without full details.
+    This tool provides quick statistical summaries WITHOUT returning any deals.
+    Useful when LLM needs calculations on large datasets without full deal details.
 
     Args:
         address: The address to analyze (in Hebrew or English)
@@ -1003,13 +1101,9 @@ def get_deal_statistics(
         min_rooms: Minimum number of rooms
         max_rooms: Maximum number of rooms
         iqr_multiplier: Override IQR multiplier for outlier detection (default: 1.0). Lower = more aggressive filtering
-        include_outlier_deals: If True (default), include the outlier deals in the response
-                              This allows you to see what was filtered out
 
     Returns:
-        JSON string containing:
-        - market_statistics: Statistical metrics (mean, median, percentiles, etc.)
-        - outlier_deals: Deals that were removed as outliers (if include_outlier_deals=True)
+        JSON string containing market_statistics only (no deals returned)
     """
     log_mcp_call(
         "get_deal_statistics",
@@ -1021,16 +1115,28 @@ def get_deal_statistics(
         iqr_multiplier=iqr_multiplier,
     )
     try:
+        # Get coordinates for search center
+        autocomplete_result = client.autocomplete_address(address)
+        search_coords = None
+        if autocomplete_result.results:
+            coords = autocomplete_result.results[0].coordinates
+            if coords:
+                search_coords = {"longitude": coords.longitude, "latitude": coords.latitude}
+
         # Get all deals for the address
         deals = client.find_recent_deals_for_address(address, years_back)
+
+        search_params_base = {
+            "address": address,
+            "years_back": years_back,
+        }
+        if search_coords:
+            search_params_base["search_coordinates"] = search_coords
 
         if not deals:
             return json.dumps(
                 {
-                    "search_parameters": {
-                        "address": address,
-                        "years_back": years_back,
-                    },
+                    "search_parameters": search_params_base,
                     "market_statistics": {
                         "deal_breakdown": {"total_deals": 0},
                         "message": "No deals found for this address",
@@ -1038,7 +1144,7 @@ def get_deal_statistics(
                     "deals": [],
                 },
                 ensure_ascii=False,
-                indent=2,
+                indent=None,
             )
 
         # Apply filters if provided
@@ -1047,21 +1153,19 @@ def get_deal_statistics(
                 deals, property_type=property_type, min_rooms=min_rooms, max_rooms=max_rooms
             )
 
-        # Calculate statistics
+        # Calculate statistics (don't need outlier deals for statistics-only tool)
         stats = client.calculate_deal_statistics(
-            deals, iqr_multiplier=iqr_multiplier, include_outlier_deals=include_outlier_deals
+            deals, iqr_multiplier=iqr_multiplier, include_outlier_deals=False
         )
 
-        # Build response
+        # Build response - statistics only, NO deals
+        search_params_base["filters_applied"] = {
+            "property_type": property_type,
+            "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
+        }
+
         response_data = {
-            "search_parameters": {
-                "address": address,
-                "years_back": years_back,
-                "filters_applied": {
-                    "property_type": property_type,
-                    "rooms": f"{min_rooms}-{max_rooms}" if min_rooms or max_rooms else None,
-                },
-            },
+            "search_parameters": search_params_base,
             "market_statistics": {
                 "deal_breakdown": {
                     "total_deals": stats.total_deals,
@@ -1072,14 +1176,9 @@ def get_deal_statistics(
                 "property_type_distribution": stats.property_type_distribution,
                 "date_range": stats.date_range,
             },
-            "deals": [],  # Statistics-only query, no full deals returned
         }
 
-        # Add outlier deals if present and requested
-        if include_outlier_deals and stats.outlier_report and stats.outlier_report.outlier_deals:
-            response_data["outlier_deals"] = strip_bloat_fields(stats.outlier_report.outlier_deals)
-
-        return json.dumps(response_data, ensure_ascii=False, indent=2)
+        return json.dumps(response_data, ensure_ascii=False, indent=None)
 
     except Exception as e:
         logger.error(f"Error in get_deal_statistics: {e}", exc_info=True)
@@ -1139,17 +1238,29 @@ def get_market_activity_metrics(address: str, years_back: int = 2, radius_meters
         radius_meters=radius_meters,
     )
     try:
+        # Get coordinates for search center
+        autocomplete_result = client.autocomplete_address(address)
+        search_coords = None
+        if autocomplete_result.results:
+            coords = autocomplete_result.results[0].coordinates
+            if coords:
+                search_coords = {"longitude": coords.longitude, "latitude": coords.latitude}
+
         # Get deals for the address
         deals = client.find_recent_deals_for_address(address, years_back, radius_meters)
+
+        analysis_params_base = {
+            "address": address,
+            "years_back": years_back,
+            "radius_meters": radius_meters,
+        }
+        if search_coords:
+            analysis_params_base["search_coordinates"] = search_coords
 
         if not deals:
             return json.dumps(
                 {
-                    "analysis_parameters": {
-                        "address": address,
-                        "years_back": years_back,
-                        "radius_meters": radius_meters,
-                    },
+                    "analysis_parameters": analysis_params_base,
                     "market_statistics": {
                         "deal_breakdown": {
                             "total_deals": 0,
@@ -1159,7 +1270,7 @@ def get_market_activity_metrics(address: str, years_back: int = 2, radius_meters
                     "error": "No deals found for analysis",
                 },
                 ensure_ascii=False,
-                indent=2,
+                indent=None,
             )
 
         # Calculate market metrics using helper to reduce duplication
@@ -1170,11 +1281,7 @@ def get_market_activity_metrics(address: str, years_back: int = 2, radius_meters
         # Combine all metrics with normalized structure
         return json.dumps(
             {
-                "analysis_parameters": {
-                    "address": address,
-                    "years_back": years_back,
-                    "radius_meters": radius_meters,
-                },
+                "analysis_parameters": analysis_params_base,
                 "market_statistics": {
                     "deal_breakdown": {
                         "total_deals": len(deals),
@@ -1195,7 +1302,7 @@ def get_market_activity_metrics(address: str, years_back: int = 2, radius_meters
                 "deals": [],  # Activity metrics don't return raw deals
             },
             ensure_ascii=False,
-            indent=2,
+            indent=None,
         )
 
     except Exception as e:

@@ -6,7 +6,7 @@ This module provides shared helper functions with no external dependencies
 """
 
 import re
-from typing import Tuple
+from typing import Optional, Tuple
 
 
 def calculate_distance(point1: Tuple[float, float], point2: Tuple[float, float]) -> float:
@@ -26,6 +26,43 @@ def calculate_distance(point1: Tuple[float, float], point2: Tuple[float, float])
     dx = point2[0] - point1[0]
     dy = point2[1] - point1[1]
     return (dx * dx + dy * dy) ** 0.5
+
+
+def extract_shape_centroid(shape_wkt: Optional[str]) -> Optional[Tuple[float, float]]:
+    """
+    Extract centroid coordinates from WKT geometry (MULTIPOLYGON/POLYGON).
+
+    Parses WKT string and calculates centroid as average of all coordinate points.
+
+    Args:
+        shape_wkt: WKT geometry string (e.g., "MULTIPOLYGON(...)")
+
+    Returns:
+        (longitude, latitude) tuple in ITM coordinates, or None if parsing fails
+    """
+    if not shape_wkt or not isinstance(shape_wkt, str):
+        return None
+
+    try:
+        # Extract all coordinate pairs using regex
+        # Matches: "number.number number.number" or "number number"
+        coord_pattern = r"([\d.]+)\s+([\d.]+)"
+        matches = re.findall(coord_pattern, shape_wkt)
+
+        if not matches:
+            return None
+
+        # Calculate average (centroid)
+        lons = [float(m[0]) for m in matches]
+        lats = [float(m[1]) for m in matches]
+
+        centroid_lon = sum(lons) / len(lons)
+        centroid_lat = sum(lats) / len(lats)
+
+        return (centroid_lon, centroid_lat)
+
+    except (ValueError, ZeroDivisionError):
+        return None
 
 
 def is_same_building(search_address: str, deal_address: str) -> bool:
